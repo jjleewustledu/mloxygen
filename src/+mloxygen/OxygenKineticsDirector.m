@@ -1,4 +1,4 @@
-classdef OxygenKineticsDirector < mlkinetics.AbstractIterableKineticsDirector
+classdef OxygenKineticsDirector 
 	%% OXYGENKINETICSDIRECTOR  
 
 	%  $Revision$
@@ -40,7 +40,6 @@ classdef OxygenKineticsDirector < mlkinetics.AbstractIterableKineticsDirector
  			%  @param oxygenBldr is an mlkinetics.IKineticsBuilder.
             %  @param named model is an mlhemodynamics.HemodynamicsModel.
 
-            this = this@mlkinetics.AbstractIterableKineticsDirector(varargin{:});
  			ip = inputParser;
             addRequired( ip, 'oxygenBldr', @(x) isa(x, 'mloxygen.OxygenKineticsBuilder'));
             addParameter(ip, 'roisBldr', @(x) isa(x, 'mlrois.IRoisBuilder'));
