@@ -1,4 +1,4 @@
-classdef Martin1987 < handle
+classdef Martin1987 < handle & matlab.mixin.Copyable 
 	%% Martin1987  
 
 	%  $Revision$
@@ -7,125 +7,161 @@ classdef Martin1987 < handle
  	%% It was developed on Matlab 9.4.0.813654 (R2018a) for MACI64.  Copyright 2018 John Joowon Lee.
  	
     properties (Constant)
-        DENSITY_BRAIN = 1.05 % assumed mean brain density, g/mL
+        BLOOD_DENSITY = 1.06 % https://hypertextbook.com/facts/2004/MichaelShmukler.shtml; human whole blood 37 C
+        BRAIN_DENSITY = 1.05 % Torack et al., 1976
         RATIO_SMALL_LARGE_HCT = 0.85 % Grubb, et al., 1978
+        PLASMA_DENSITY = 1.03
     end
     
 	properties (Dependent)
+        averageVoxels
+        ispercent
         T0 % integration limits
         Tf % integration limits
- 		aif
-        ispercent
-        tac
-        W % := 1; aif and tac manage their own calibrations
-        
-        subject
-        session
-        scan
- 	end
+    end
+    
+    methods (Static)
+        function this = createFromDeviceKit(devkit)
+            this = mloxygen.Martin1987('devkit', devkit, 'T0', 120, 'TF', 240);
+        end
+    end
 
 	methods 
         
         %% GET
         
+        function g = get.averageVoxels(this)
+            g = this.averageVoxels_;
+        end
+        function     set.averageVoxels(this, s)
+            assert(islogical(s))
+            this.averageVoxels_ = s;
+        end
+        function g = get.ispercent(this)
+            g = this.ispercent_;
+        end
         function g = get.T0(this)
             g = this.T0_;
         end
         function g = get.Tf(this)
             g = this.Tf_;
         end
-        function g = get.aif(this)
-            g = this.aif_;
-        end
-        function g = get.ispercent(this)
-            g = this.ispercent_;
-        end
-        function g = get.tac(this)
-            g = this.tac_;
-        end
-        function g = get.W(~)
-            g = 1;
-        end
-        
-        function g = get.subject(this)
-            g = this.xnatinfo_.subject;
-        end
-        function g = get.session(this)
-            g = this.xnatinfo_.session;
-        end
-        function g = get.scan(this)
-            g = this.xnatinfo_.scan;
-        end
         
         %%
         
-        function dt = datetime(this)
-            dt = datetime(this.tac);
-            diff = seconds(dt - datetime(this.aif));
-            assert(abs(diff) < seconds(10), ...
-                'mloxygen:ValueError', 'Martin1987.datetime:  difference of datetimes TAC - AIF => %g sec', diff);
-        end
-        function e = estimate(this)
-            assert(~this.tac.isDecayCorrected);
-            assert(~this.aif.isDecayCorrected);
+        function v = buildCbv(this, varargin)
+            
+            ip = inputParser;
+            ip.KeepUnmatched = true;
+            addParameter(ip, 'roi', [], @(x) isa(x, 'mlfourd.ImagingContext2'))
+            addParameter(ip, 'averageVoxels', this.averageVoxels, @islogical)
+            parse(ip, varargin{:})
+            ipr = ip.Results;
 
-            scale = this.W / (this.RATIO_SMALL_LARGE_HCT * this.DENSITY_BRAIN);
-            if (this.ispercent)
+            scale = 1/(this.RATIO_SMALL_LARGE_HCT * this.BRAIN_DENSITY * this.BLOOD_DENSITY );
+            if this.ispercent
                 scale = 100*scale;
             end
+            aif = this.arterial_.activityDensity();
+            aif = aif(this.T0:this.Tf);
             
-            e = scale * trapz(this.tac, this.T0, this.Tf) / trapz(this.aif, this.T0, this.Tf);
+            if ipr.averageVoxels
+                s = this.scanner_.volumeAveraged(ipr.roi);
+                times = s.times;
+                times = times(this.T0 < s.times & s.times < this.Tf);
+                tac = s.activityDensity();
+                tac = tac(this.T0 < s.times & s.times < this.Tf);
+                v = scale * trapz(times, tac)/ ...
+                    trapz(this.T0:this.Tf, aif);
+            else
+                s = this.scanner_.masked(ipr.roi);
+                times = s.times;
+                times = times(this.T0 <= s.times & s.times <= this.Tf);
+                tac = s.activityDensity();
+                tac = tac(:,:,:,this.T0 <= s.times & s.times <= this.Tf);
+                tac = permute(tac, [4 1 2 3]);
+                img = scale * trapz(times, tac)/ ...
+                    trapz(this.T0:this.Tf, aif);
+                img = squeeze(img);
+                ifc = this.scanner_.imagingContext.fourdfp;
+                ifc.img = img;
+                if this.ispercent
+                    ifc.fileprefix = strrep(ifc.fileprefix, 'oc', 'cbv');
+                else
+                    ifc.fileprefix = strrep(ifc.fileprefix, 'oc', 'v1');
+                end
+                v = mlfourd.ImagingContext2(ifc);
+            end
         end
-        function plotWorldlines(this, varargin)
-            a = this.aif;
-            t = this.tac;
-            plot(a.times, a.activities, t.times, t.activities, varargin{:});
-            xlabel('t / sec');
-            ylabel('activity / (Bq/mL)');
-            legend('AIF', 'TAC');
-            title(this);
+        function buildQC(this, varargin)
+
+            return
+            
+            ip = inputParser;
+            ip.KeepUnmatched = true;
+            addParameter(ip, 'roi', [], @(x) isa(x, 'mlfourd.ImagingContext2'))
+            addParameter(ip, 'cbv', [], @isnumeric)
+            parse(ip, varargin{:})
+            ipr = ip.Results;
+            
+            this.scanner_.masked(ipr.roi)            
+            disp(this.arterial_)
+            this.arterial_.plot()
+            title('Martin1987.buildQC().this.arterial_.plot()')
+            disp(this.scanner_)
+            this.scanner_.plot()
+            title('Martin1987.buildQC().this.scanner_.plot()')
+            this.scanner_.imagingContext.fsleyes()
         end
-        function str = title(this)
-            str = sprintf('Martin1987 CBV %s %s %s %s', ...
-                char(this.subject), char(this.session), char(this.scan), datetime(this));
-        end
-		  
+    end
+    
+    %% PROTECTED
+    
+    methods (Access = protected)		  
  		function this = Martin1987(varargin)
  			%% Martin1987
+            %  @param devkit is mlpet.IDeviceKit.
  			%  @param T0 is numeric.
             %  @param Tf is numeric.
-            %  @param aif is mlpet.IAifData.
             %  @param ispercent is logical.
-            %  @param tac is mlpet.IScannerData.
-            %  @param xnatinfo is mlxnat.<>.
 
             ip = inputParser;
+            addParameter(ip, 'devkit', [], @(x) isa(x, 'mlpet.IDeviceKit'));
             addParameter(ip, 'T0', nan, @isnumeric);
             addParameter(ip, 'Tf', nan, @isnumeric);
             addParameter(ip, 'ispercent', true, @islogical);
-            addParameter(ip, 'aif', [], @(x) isa(x, 'mlpet.IAifData'));
-            addParameter(ip, 'tac', [], @(x) isa(x, 'mlpet.IScannerData'));
-            addParameter(ip, 'xnatinfo', [], @(x) isa(x, 'mlxnat.<>'));
+            addParameter(ip, 'averageVoxels', true, @islogical);
             parse(ip, varargin{:});
+            ipr = ip.Results;
  			
-            this.T0_        = ip.Results.T0;
-            this.Tf_        = ip.Results.Tf;
-            this.aif_       = ip.Results.aif;
-            this.ispercent_ = ip.Results.ispercent;
-            this.tac_       = ip.Results.tac;
-            this.xnatinfo_  = ip.Results.xnatinfo;
+            this.devkit_    = ipr.devkit;
+            this.T0_        = ipr.T0;
+            this.Tf_        = ipr.Tf;
+            this.ispercent_ = ipr.ispercent;
+            this.averageVoxels_ = ipr.averageVoxels;
+            
+            this.scanner_  = this.devkit_.buildScannerDevice();
+            this.arterial_ = this.devkit_.buildArterialSamplingDevice(this.scanner_);
+            this.counting_ = this.devkit_.buildCountingDevice();
  		end
+        function that = copyElement(this)
+            %%  See also web(fullfile(docroot, 'matlab/ref/matlab.mixin.copyable-class.html'))
+            
+            that = copyElement@matlab.mixin.Copyable(this);
+        end
     end 
     
     %% PRIVATE
     
     properties (Access = private)
+        averageVoxels_
+        arterial_
+        counting_
+        devkit_
+        ispercent_
+        scanner_
         T0_
         Tf_
-        aif_
-        ispercent_
-        tac_
-        xnatinfo_
     end
 
 	%  Created with Newcl by John J. Lee after newfcn by Frank Gonzalez-Morphy
