@@ -16,6 +16,7 @@ classdef Martin1987 < handle & matlab.mixin.Copyable
 	properties (Dependent)
         averageVoxels
         ispercent
+        sessionData
         T0 % integration limits
         Tf % integration limits
     end
@@ -40,6 +41,9 @@ classdef Martin1987 < handle & matlab.mixin.Copyable
         function g = get.ispercent(this)
             g = this.ispercent_;
         end
+        function g = get.sessionData(this)
+            g = this.devkit_.sessionData;
+        end
         function g = get.T0(this)
             g = this.T0_;
         end
@@ -63,14 +67,15 @@ classdef Martin1987 < handle & matlab.mixin.Copyable
                 scale = 100*scale;
             end
             aif = this.arterial_.activityDensity();
-            aif = aif(this.T0:this.Tf);
+            this.boundTfByAif(aif);
+            aif = aif(this.T0+1:this.Tf+1);
             
             if ipr.averageVoxels
                 s = this.scanner_.volumeAveraged(ipr.roi);
                 times = s.times;
-                times = times(this.T0 < s.times & s.times < this.Tf);
+                times = times(this.T0 <= s.times & s.times <= this.Tf);
                 tac = s.activityDensity();
-                tac = tac(this.T0 < s.times & s.times < this.Tf);
+                tac = tac(this.T0 <= s.times & s.times <= this.Tf);
                 v = scale * trapz(times, tac)/ ...
                     trapz(this.T0:this.Tf, aif);
             else
@@ -86,9 +91,9 @@ classdef Martin1987 < handle & matlab.mixin.Copyable
                 ifc = this.scanner_.imagingContext.fourdfp;
                 ifc.img = img;
                 if this.ispercent
-                    ifc.fileprefix = strrep(ifc.fileprefix, 'oc', 'cbv');
+                    ifc.fileprefix = this.sessionData.cbvOnAtlas('typ', 'fp');
                 else
-                    ifc.fileprefix = strrep(ifc.fileprefix, 'oc', 'v1');
+                    ifc.fileprefix = this.sessionData.v1OnAtlas('typ', 'fp');
                 end
                 v = mlfourd.ImagingContext2(ifc);
             end
@@ -143,7 +148,18 @@ classdef Martin1987 < handle & matlab.mixin.Copyable
             this.scanner_  = this.devkit_.buildScannerDevice();
             this.arterial_ = this.devkit_.buildArterialSamplingDevice(this.scanner_);
             this.counting_ = this.devkit_.buildCountingDevice();
- 		end
+        end
+        function boundTfByAif(this, aif)
+            if (this.Tf+1)/length(aif) > 1.25
+                error('mloxygen:ValueError', ...
+                    'Martin1987.boundTfByAif:  Tf->%g exceeds length(aif)->%g', this.Tf, length(aif))
+            end
+            if (this.Tf+1) > length(aif)
+                warning('mloxygen:ValueWarning', ...
+                    'Martin1987.boundTfByAif:  Tf->%g exceeds length(aif)->%g', this.Tf, length(aif))
+                this.Tf_ = length(aif)-1;
+            end
+        end
         function that = copyElement(this)
             %%  See also web(fullfile(docroot, 'matlab/ref/matlab.mixin.copyable-class.html'))
             
