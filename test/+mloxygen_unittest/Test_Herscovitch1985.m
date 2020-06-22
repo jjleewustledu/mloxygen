@@ -68,7 +68,7 @@ classdef Test_Herscovitch1985 < matlab.unittest.TestCase
             %figure; plot(midt, wellCounts); title('test_wholeBrainCbf')
             
             petobs = trapz(midt(range), petCounts(range));
-            cbf = obj.polynomialCbf([obj.a1 obj.a2], petobs);
+            cbf = obj.polynomialMetric([obj.a1 obj.a2], petobs);
             this.verifyEqual(cbf, 44.066954720038126, 'RelTol', 0.01)
             fprintf('test_wholeBrainCbf.obj.a1->%g\n', obj.a1)
             fprintf('test_wholeBrainCbf.obj.a2->%g\n', obj.a2)
@@ -80,8 +80,8 @@ classdef Test_Herscovitch1985 < matlab.unittest.TestCase
             midt = (tac.Start+tac.End)/2;
             range = 0 <= midt & midt <= obj.hodata.dcv.time(end-2);
             
-            ho = mlfourd.ImagingContext2('p7667ho1_reg_2fdg.nii');
-            wmparc = mlfourd.ImagingContext2('p7667fdg1_wmparc.nii');
+            ho = mlfourd.ImagingContext2([obj.pnumber 'ho1_reg_2fdg.nii']);
+            wmparc = mlfourd.ImagingContext2([obj.pnumber 'fdg1_wmparc.nii']);
             mask = wmparc.binarized;
             ho = ho.volumeAveraged(mask);
             petCounts = ho.nifti.img'/1000;
@@ -89,7 +89,7 @@ classdef Test_Herscovitch1985 < matlab.unittest.TestCase
             %figure; plot(midt, wellCounts); title('test_wholeBrainCbf2')
             
             petobs = trapz(midt(range), petCounts(range));
-            cbf = obj.polynomialCbf([obj.a1 obj.a2], petobs);
+            cbf = obj.polynomialMetric([obj.a1 obj.a2], petobs);
             this.verifyEqual(double(cbf), 44.066954720038126, 'RelTol', 0.01)
             fprintf('test_wholeBrainCbf.obj.a1->%g\n', obj.a1)
             fprintf('test_wholeBrainCbf.obj.a2->%g\n', obj.a2)
@@ -130,13 +130,89 @@ classdef Test_Herscovitch1985 < matlab.unittest.TestCase
             oef.fsleyes()
         end
         function test_buildCmro2(this)
+            cmro2 = this.testObj.buildCmro2(1);
+            cmro2.fsleyes()
+        end
+        function test_buildAll(this)
+            this.testObj.buildCmro2(1);
+            
+            this.testObj.imagingContextCbf.fsleyes()
+            this.testObj.imagingContextCbf.save()
+            this.testObj.imagingContextCbv.fsleyes()
+            this.testObj.imagingContextCbv.save()
+            this.testObj.imagingContextCmro2.fsleyes()
+            this.testObj.imagingContextCmro2.save()
+            this.testObj.imagingContextOef.fsleyes()
+            this.testObj.imagingContextOef.save()
+        end
+        function test_tacScaling(this)
+            tra = 'oo';
+            dat = [tra 'data'];
+            tac = this.testObj.(dat).tac;
+            
+            % assemble smooth dynamic tracer962 and make time-summed
+            tracerfp = [this.testObj.pnumber tra '1'];
+            tracer962 = mlfourd.ImagingContext2([tracerfp '.4dfp.hdr']);
+            %tracer962.fsleyes()
+            if ~strcmp(tra, 'oc')
+                peek = tracer962.volumeAveraged();
+                plot(tac.Start, peek.fourdfp.img)
+                tmp = tracer962.fourdfp;
+                try
+                    assert(length(tac.Dur_sec) == size(tracer962, 4))
+                    for t = 1:length(tac.Dur_sec)
+                        tmp.img(:,:,:,t) = tmp.img(:,:,:,t)/tac.Dur_sec(t);
+                    end
+                catch ME
+                    handwarning(ME)
+                    warning('mloxygen:RuntimeWarning', 'trying tac.Dur since tac.Dur_sec not found')
+                    assert(length(tac.Dur) == size(tracer962, 4))
+                    for t = 1:length(tac.Dur)
+                        tmp.img(:,:,:,t) = tmp.img(:,:,:,t)/tac.Dur(t);
+                    end
+                end
+                tracer962 = mlfourd.ImagingContext2(tmp);
+                peek = tracer962.volumeAveraged();
+                plot(tac.Start, peek.fourdfp.img)
+                tracer962 = tracer962.timeSummed();
+            end
+            tracer962.fsleyes()
+            
+            % make dynamic tracernii time-summed            
+            tracernii = mlfourd.ImagingContext2([tracerfp '_reg_2fdg.nii']);
+            %tracernii.fsleyes()
+            tracernii = tracernii.timeSummed();
+            tracernii.save()
+            tracernii.fsleyes()
+            
+            % register tracer962 to tracernii, all time-summed
+            tracer962.fileprefix = [tracerfp '_962_sumt']; tracer962.filesuffix = '.nii'; tracer962.save();
+            mlbash(sprintf( ...
+                'flirt -in %s -ref %s_reg_2fdg_sumt.nii -out %s_reg_2fdg.nii.gz -omat %s_reg_2fdg.mat -bins 256 -cost corratio -searchrx -90 90 -searchry -90 90 -searchrz -90 90 -dof 6  -interp trilinear', ...
+                tracer962.filename, tracerfp, tracer962.fileprefix, tracer962.fileprefix))
+            tracer962 = mlfourd.ImagingContext2([tracer962.fileprefix '_reg_2fdg.nii.gz']);
+            %tracer962.fsleyes()
+            
+            %  plot vectors of time-summed for inspecting correlations
+            tracer962_vec = reshape(tracer962.nifti.img, [128*128*63 1]);
+            tracernii_vec = reshape(tracernii.nifti.img, [128*128*63 1]);
+            plot(tracer962_vec, tracernii_vec, '.')
+            ylabel('PETobs NIfTI')
+            xlabel('PETobs 962to4dfp_framecheck')
+            title([upper(tra) ' time-summed'])
+            saveFigures(pwd, 'prefix', [this.testObj.pnumber '_' upper(tra) '_time_summed'], 'closeFigure', false)
+        end
+        function test_flirt2atl(this)
+            this.testObj.flirt2atl()
         end
 	end
 
  	methods (TestClassSetup)
 		function setupHerscovitch1985(this)
             sessp = fullfile(getenv('HOME'), 'Tmp', 'p7667');
-            this.testObj_ = mloxygen.Herscovitch1985('sessionPath', sessp);
+            this.testObj_ = mloxygen.Herscovitch1985('sessionPath', sessp, 'pie', 5.2705);
+            %sessp = fullfile(getenv('HOME'), 'Tmp', 'p7757');
+            %this.testObj_ = mloxygen.Herscovitch1985('sessionPath', sessp, 'pie', 5.3498); % 5.2705
  		end
 	end
 

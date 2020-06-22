@@ -36,7 +36,10 @@ classdef Herscovitch1985 < handle & matlab.mixin.Copyable
         oodata
         ooFracTime  = 120
         petPointSpread = [7.311094309335641 7.311094309335641 5.330000000000000]
-        pie % see also:  man pie       
+        pie % see also:  man pie  
+        scaleHO = 1000
+        scaleOC = 7
+        scaleOO = 800
  		sessionPath % contains all data specific to scan session.
         startTime
         verbose
@@ -47,6 +50,7 @@ classdef Herscovitch1985 < handle & matlab.mixin.Copyable
         aifOO
         aifOOIntegral
         decayRate
+        imagingContextBrainmask
         imagingContextHO
         imagingContextOC
         imagingContextOO
@@ -58,14 +62,22 @@ classdef Herscovitch1985 < handle & matlab.mixin.Copyable
     end
     
     methods (Static) 
-        function metric = polynomialMetric(As, petobs)
-            metric = petobs.^2*As(1) + petobs*As(2);
-        end  
         function cbf = invsToCbf(f)
             cbf = 6000*f/mloxygen.Herscovitch1985.DENSITY_BRAIN;
         end
-        function f   = cbfToInvs(cbf)
+        function f = cbfToInvs(cbf)
             f = cbf*mloxygen.Herscovitch1985.DENSITY_BRAIN/6000;
+        end
+        function metric = polynomialMetric(As, petobs)
+            metric = petobs.^2*As(1) + petobs*As(2);
+        end  
+        function replaceHeader(in, hdr)
+            hdr = mlfourd.ImagingContext2(hdr);
+            in  = mlfourd.ImagingContext2(in);
+            hdr = hdr.nifti;
+            hdr.img = in.nifti.img;
+            hdr.fqfilename = in.fqfilename;
+            hdr.save()
         end
     end
     
@@ -93,6 +105,9 @@ classdef Herscovitch1985 < handle & matlab.mixin.Copyable
         end
         function g = get.decayRate(this)
             g = log(2)/this.halflife;
+        end
+        function g = get.imagingContextBrainmask(this)
+            g = mlfourd.ImagingContext2([this.pnumber '_brainmask_reg_2fdg.nii']);
         end
         function g = get.imagingContextHO(this)
             g = mlfourd.ImagingContext2([this.pnumber 'ho1_reg_2fdg.nii']);
@@ -174,7 +189,7 @@ classdef Herscovitch1985 < handle & matlab.mixin.Copyable
             this.b4 = model.Coefficients{2, 'Estimate'};
         end        
         function cbf  = buildCbf(this)
-            if isempty(this.a1) || isempty(this.a2)
+            if isempty(this.a1) && isempty(this.a2)
                 this.buildA1A2();
             end            
             petobs = this.tracer2petobs('ho');
@@ -192,21 +207,32 @@ classdef Herscovitch1985 < handle & matlab.mixin.Copyable
             this.imagingContextCbv = cbv;
         end  
         function cmro2 = buildCmro2(this, o2content)
-            cmro2 = this.imagingContextCbf .* this.imagingContextOef .* o2content;
-            this.imagingContextCmro2 = cmro2;
-        end
-        function oef  = buildOef(this)
-            if isempty(this.b1) || isempty(this.b2)
-                this.buildB1B2();
-                this.buildB3B4();
-            end
             if isempty(this.imagingContextCbf)
                 this.buildCbf()
             end
             if isempty(this.imagingContextCbv)
                 this.buildCbv()
+            end             
+            if isempty(this.imagingContextOef)
+                this.buildOef()
             end            
-            petobs = this.tracer2petobs('ho');
+            cmro2 = this.imagingContextCbf .* this.imagingContextOef .* o2content;
+            cmro2.fileprefix = [this.pnumber 'cmro2_reg_2fdg'];
+            cmro2.filesuffix = '.nii';
+            this.imagingContextCmro2 = cmro2;
+        end
+        function oef  = buildOef(this)
+            if isempty(this.imagingContextCbf)
+                this.buildCbf()
+            end
+            if isempty(this.imagingContextCbv)
+                this.buildCbv()
+            end 
+            if isempty(this.b1) && isempty(this.b2)
+                this.buildB1B2();
+                this.buildB3B4();
+            end           
+            petobs = this.tracer2petobs('oo');
             nimg = this.buildOefNumer(petobs);
             dimg = this.buildOefDenom();
             oef = this.ensure0to1(nimg./dimg);
@@ -260,6 +286,35 @@ classdef Herscovitch1985 < handle & matlab.mixin.Copyable
             int = trapz(this.aifOO.dcv_well(range));
             int = 0.01*this.RATIO_SMALL_LARGE_HCT*this.DENSITY_BRAIN*int;
         end
+        function        flirt2atl(this)
+            
+            % align fdg
+            if ~isfile([this.pnumber 'fdg1_avgt.nii'])
+                fdg = mlfourd.ImagingContext2([this.pnumber 'fdg1.nii']);
+                fdg = fdg.timeAveraged();
+                fdg.save
+            end            
+            std = '/usr/local/fsl/data/standard/MNI152_T1_2mm';
+            [~,stdbase] = fileparts(std);
+            if ~isfile([this.pnumber 'fdg1_avgt_on_' stdbase '.nii'])
+                mlbash(sprintf( ...
+                    'flirt -in %sfdg1_avgt.nii -ref %s -out %sfdg1_avgt_on_%s.nii -omat %sfdg1_avgt_on_%s.mat -bins 256 -cost corratio -searchrx -90 90 -searchry -90 90 -searchrz -90 90 -dof 12  -interp trilinear', ...
+                    this.pnumber, std, this.pnumber, stdbase, this.pnumber, stdbase))
+            end
+            
+            % align physiological
+            hiresT1 = fullfile(getenv('REFDIR'), 'mni_icbm152_t1_tal_nlin_asym_09b_hires.nii');
+            refprefix = [this.pnumber 'fdg1_avgt_on_MNI152_T1_2mm'];
+            for phy = {'cbf' 'cbv' 'oef' 'cmro2'}
+                in  = [this.pnumber phy{1} '_reg_2fdg.nii'];
+                out = [this.pnumber phy{1} '_on_MNI152_T1_2mm.nii.gz'];
+                this.replaceHeader(in, [this.pnumber 'fdg1_avgt.nii'])
+                mlbash(sprintf( ...
+                    'flirt -in %s -applyxfm -init %s.mat -out %s -paddingsize 0.0 -interp trilinear -ref %s.nii.gz', ...
+                    in, refprefix, out, std))
+                mlbash(sprintf('fsleyes %s -cm brain_colours_nih_new %s -a 60', out, hiresT1))
+            end
+        end
         function f    = flowHOMetab(this)
             %% @return numeric flow
             
@@ -307,7 +362,7 @@ classdef Herscovitch1985 < handle & matlab.mixin.Copyable
             plot(this, 'oc')
             subplot(3, 1, 3)
             plot(this, 'oo')
-        end   
+        end  
         function this = shiftAif(this, varargin)
             ip = inputParser;
             addRequired(ip, 'tracer', @ischar)
@@ -352,21 +407,21 @@ classdef Herscovitch1985 < handle & matlab.mixin.Copyable
             
             ict = ['imagingContext' upper(tra)];
             ic2 = this.(ict);
-            mask = this.imagingContextWmparc;
+            mask = this.imagingContextBrainmask;
             mask = mask.binarized;
-            ic2 = ic2.blurred(this.videenBlur);
+            ic2 = ic2.blurred(this.petPointSpread);
             ic2 = ic2.masked(mask);
             switch tra
                 case 'ho' 
-                    petCounts = ic2.nifti.img(:,:,:,range)/1000;
+                    petCounts = ic2.nifti.img(:,:,:,range)/this.scaleHO;
                     for it = 1:length(midt)
                         petCounts(:,:,:,it) = petCounts(:,:,:,it)*2^(-midt(it)/this.halflife);
                     end                   
                     petobs = trapz(midt, petCounts, 4);
                 case 'oc'
-                    petobs = ic2.nifti.img/7;
+                    petobs = ic2.nifti.img/this.scaleOC;
                 case 'oo' 
-                    petCounts = ic2.nifti.img(:,:,:,range)/365;
+                    petCounts = ic2.nifti.img(:,:,:,range)/this.scaleOO;
                     for it = 1:length(midt)
                         petCounts(:,:,:,it) = petCounts(:,:,:,it)*2^(-midt(it)/this.halflife);
                     end                   
@@ -463,8 +518,8 @@ classdef Herscovitch1985 < handle & matlab.mixin.Copyable
         function this = readdata(this, tra)
             %% assumes that tac acquisition begins with tac.Start(1) == 0
             
-            dcv = readtable(fullfile(this.sessionPath, sprintf('p7667%s1.dcv', tra)), 'FileType', 'text');
-            tac = readtable(fullfile(this.sessionPath, sprintf('p7667%s1_frame_tac.csv', tra)));
+            dcv = readtable(fullfile(this.sessionPath, sprintf('%s%s1.dcv', this.pnumber, tra)), 'FileType', 'text');
+            tac = readtable(fullfile(this.sessionPath, sprintf('%s%s1_frame_tac.csv', this.pnumber, tra)));
             this.startTime = tac.Start(1);
             tac.Start = tac.Start - this.startTime;
             tac.End = tac.End - this.startTime;
