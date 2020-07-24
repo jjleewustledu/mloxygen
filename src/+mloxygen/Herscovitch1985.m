@@ -32,16 +32,18 @@ classdef Herscovitch1985 < handle & matlab.mixin.Copyable
         imagingContextCbv
         imagingContextCmro2
         imagingContextOef
+        o2content
         ocdata
         oodata
         ooFracTime  = 120
-        petPointSpread = [7.311094309335641 7.311094309335641 5.330000000000000]
         pie % see also:  man pie  
         scaleHO = 1000
-        scaleOC = 7
-        scaleOO = 800
+        scaleOC = 1000
+        scaleOO = 1000
  		sessionPath % contains all data specific to scan session.
+        shiftWorldline = false
         startTime
+        studyTag
         verbose
     end
     
@@ -56,6 +58,7 @@ classdef Herscovitch1985 < handle & matlab.mixin.Copyable
         imagingContextOO
         imagingContextWmparc
         ooPeakTime
+        petPointSpread
         pnumber
         videenBlur
         W % well factor
@@ -124,6 +127,9 @@ classdef Herscovitch1985 < handle & matlab.mixin.Copyable
         function g = get.ooPeakTime(this)
             [~,g] = max(this.oodata.dcv.dcv_well);
         end
+        function g = get.petPointSpread(this)
+            g = [7.311094309335641 7.311094309335641 5.330000000000000];
+        end
         function g = get.pnumber(this)
             [~,g] = fileparts(this.sessionPath);
         end
@@ -146,19 +152,23 @@ classdef Herscovitch1985 < handle & matlab.mixin.Copyable
  			%% HERSCOVITCH1985
  			%  @param sessionPath is folder.
             %  @param pie is numeric from pie-phantom calibration.
-            %  @param startTime is seconds, obtained from p1234tra1.4dfp.img.rec from 
-            %         $(962to4dfp_framecheck p1234tra1.v)
+            %  @param o2content in [0 1] is numeric.
             %  @param verbose is logical and provides quality controls.
+            %  @param studyTag is char
 
             ip = inputParser;
             addParameter(ip, 'sessionPath', pwd, @isfolder)
             addParameter(ip, 'pie', 5.2705, @isnumeric)
+            addParameter(ip, 'o2content', 0.2, @isnumeric)
             addParameter(ip, 'verbose', false, @islogical)
+            addParameter(ip, 'studyTag', '', @ischar)
             parse(ip, varargin{:})
  			ipr = ip.Results;
             this.sessionPath = ipr.sessionPath;
             this.pie = ipr.pie;
+            this.o2content = ipr.o2content;
             this.verbose = ipr.verbose;
+            this.studyTag = ipr.studyTag;
             
             for tra = {'ho' 'oo' 'oc'}
                 this = this.readdata(tra{1});
@@ -194,7 +204,7 @@ classdef Herscovitch1985 < handle & matlab.mixin.Copyable
             end            
             petobs = this.tracer2petobs('ho');
             cbf = this.polynomialMetric([this.a1 this.a2], petobs);
-            cbf = mlfourd.ImagingContext2(cbf, 'filename', [this.pnumber 'cbf_reg_2fdg.nii']);
+            cbf = this.buildImagingContext2(cbf, 'filename', [this.pnumber 'cbf_reg_2fdg.nii']);
             this.imagingContextCbf = cbf;
         end
         function cbv  = buildCbv(this)
@@ -202,11 +212,16 @@ classdef Herscovitch1985 < handle & matlab.mixin.Copyable
             tac = this.ocdata.tac;
             petobs = this.tracer2petobs('oc');
             int = trapz(dcv.dcv_well(1:tac.Dur_sec-1));
-            cbv = 100*petobs*60*this.pie/(this.RBC_FACTOR*this.DENSITY_BRAIN*int);
-            cbv = mlfourd.ImagingContext2(cbv, 'filename', [this.pnumber 'cbv_reg_2fdg.nii']);
+            cbv = 100*petobs*60*this.pie*tac.Dur_sec/(this.RBC_FACTOR*this.DENSITY_BRAIN*int);
+            cbv = this.buildImagingContext2(cbv, 'filename', [this.pnumber 'cbv_reg_2fdg.nii']);
             this.imagingContextCbv = cbv;
         end  
-        function cmro2 = buildCmro2(this, o2content)
+        function cmro2 = buildCmro2(this, varargin)
+            ip = inputParser;
+            addParameter(ip, 'o2content', this.o2content, @isnumeric)
+            parse(ip, varargin{:})
+            ipr = ip.Results;
+            
             if isempty(this.imagingContextCbf)
                 this.buildCbf()
             end
@@ -216,10 +231,22 @@ classdef Herscovitch1985 < handle & matlab.mixin.Copyable
             if isempty(this.imagingContextOef)
                 this.buildOef()
             end            
-            cmro2 = this.imagingContextCbf .* this.imagingContextOef .* o2content;
+            cmro2 = this.imagingContextCbf .* this.imagingContextOef .* ipr.o2content;
             cmro2.fileprefix = [this.pnumber 'cmro2_reg_2fdg'];
             cmro2.filesuffix = '.nii';
             this.imagingContextCmro2 = cmro2;
+        end
+        function ic   = buildImagingContext2(this, varargin)
+            ip = inputParser;
+            addRequired(ip, 'img', @isnumeric)
+            addParameter(ip, 'filename', @ischar)
+            parse(ip, varargin{:})
+            ipr = ip.Results;
+            
+            ifc = this.imagingContextBrainmask.nifti;
+            ifc.img = ipr.img;
+            ifc.filename = ipr.filename;
+            ic = mlfourd.ImagingContext2(ifc);
         end
         function oef  = buildOef(this)
             if isempty(this.imagingContextCbf)
@@ -236,7 +263,7 @@ classdef Herscovitch1985 < handle & matlab.mixin.Copyable
             nimg = this.buildOefNumer(petobs);
             dimg = this.buildOefDenom();
             oef = this.ensure0to1(nimg./dimg);
-            oef = mlfourd.ImagingContext2(oef, 'filename', [this.pnumber 'oef_reg_2fdg.nii']);
+            oef = this.buildImagingContext2(oef, 'filename', [this.pnumber 'oef_reg_2fdg.nii']);
             this.imagingContextOef = oef;
         end  
         function img  = buildOefNumer(this, petobs) 
@@ -252,6 +279,38 @@ classdef Herscovitch1985 < handle & matlab.mixin.Copyable
             cbv = this.imagingContextCbv.nifti.img;
             int = this.estimateAifOOIntegral();
             img = this.flowOO() - 0.835*int*cbv;
+        end
+        function tbl  = buildWholebrain(this, varargin)
+            import mlfourd.ImagingContext2
+            
+            ip = inputParser;
+            addParameter(ip, 'checkmask', false, @islogical)
+            parse(ip, varargin{:})
+            
+            %mask = ImagingContext2([this.pnumber 'fdg1_wmparc.nii']);
+            mask = ImagingContext2([this.pnumber '_brainmask_reg_2fdg.nii']);
+            mask = mask.thresh(40); % CSF intensity
+            mask = mask.binarized();
+            if ip.Results.checkmask
+                mask.fsleyes(this.imagingContextBrainmask.fqfilename)
+            end
+            CBF1 = ImagingContext2([this.pnumber 'cbf_reg_2fdg.nii']);
+            CBF1 = CBF1.volumeAveraged(mask);
+            CBF1 = CBF1.nifti.img;
+            CBV1 = ImagingContext2([this.pnumber 'cbv_reg_2fdg.nii']);
+            CBV1 = CBV1.volumeAveraged(mask);
+            CBV1 = CBV1.nifti.img;
+            CMRO2_1 = ImagingContext2([this.pnumber 'cmro2_reg_2fdg.nii']);
+            CMRO2_1 = CMRO2_1.volumeAveraged(mask);
+            CMRO2_1 = CMRO2_1.nifti.img;
+            OEF1 = ImagingContext2([this.pnumber 'oef_reg_2fdg.nii']);
+            OEF1 = OEF1.volumeAveraged(mask);
+            OEF1 = OEF1.nifti.img;
+            
+            PID = str2double(this.pnumber(2:end));
+            HO_shift = this.hodata.Dt;
+            OO_shift = this.oodata.Dt;
+            tbl = table(PID, CBF1, CBV1, CMRO2_1, OEF1, HO_shift, OO_shift);
         end
         function this = decayUncorrect(this, varargin)
             ip = inputParser;
@@ -343,7 +402,7 @@ classdef Herscovitch1985 < handle & matlab.mixin.Copyable
             dcv = this.(dat).dcv;
             tac = this.(dat).tac;
             if 1 == length(tac.whole_brain)
-                time = ((tac.Start+tac.End)/2:dcv.time(end))';
+                time = ((tac.Start+tac.End)/2-1:(tac.Start+tac.End)/2+1)'; % dither for visibility
                 whole_brain = tac.whole_brain*ones(size(time));
             else
                 time = (tac.Start+tac.End)/2;
@@ -380,11 +439,15 @@ classdef Herscovitch1985 < handle & matlab.mixin.Copyable
             % shift dcv in time to match inflow with dtac            
             [~,idx_dcv_inflow] = max(dcv.dcv_well > max(dcv.dcv_well)/2);
             [~,idx_dtac_inflow] = max(dtac > max(dtac)/2);
-            Dt = dcv.time(idx_dcv_inflow) - unif_midt(idx_dtac_inflow); % Dt > 0 typically for NNICU ECAT EXACT HR+
-            this.(dat).dcv.time = dcv.time - Dt;
+            this.(dat).Dt = dcv.time(idx_dcv_inflow) - unif_midt(idx_dtac_inflow); % Dt > 0 typically for NNICU ECAT EXACT HR+
+            this.(dat).dcv.time = dcv.time - this.(dat).Dt;
             
             % rescale dcv to adjust for alterations of activity worldlines
-            this.(dat).dcv.dcv_well = dcv.dcv_well*2^(Dt/this.halflife);
+            if this.shiftWorldline
+                this.(dat).dcv.dcv_well = dcv.dcv_well*2^(this.(dat).Dt/this.halflife);
+            else
+                this.(dat).dcv.dcv_well = dcv.dcv_well;
+            end
         end    
         function petobs = tracer2petobs(this, tra)
             assert(ischar(tra))
@@ -432,23 +495,23 @@ classdef Herscovitch1985 < handle & matlab.mixin.Copyable
         end 
     end
     
-    %% PRIVATE   
+    %% PROTECTED
     
-    properties (Access = private)
+    properties (Access = protected)
         aifHOMetab_
         aifOO_
         aifOOIntegral_
         W_
     end
     
-    methods (Access = private)
+    methods (Access = protected)
         function img  = ensure0to1(~, img)
             %% @return numeric
                       
             img(~isfinite(img)) = 0;
             img(isnan(img)) = 0;
             img(img < 0) = 0;
-            img(img > 1) = 1;
+            img(img > 1) = 0;
         end
         function petdyn = estimatedPetdyn(this, dcv, cbf)
             assert(istable(dcv))
@@ -518,8 +581,13 @@ classdef Herscovitch1985 < handle & matlab.mixin.Copyable
         function this = readdata(this, tra)
             %% assumes that tac acquisition begins with tac.Start(1) == 0
             
-            dcv = readtable(fullfile(this.sessionPath, sprintf('%s%s1.dcv', this.pnumber, tra)), 'FileType', 'text');
-            tac = readtable(fullfile(this.sessionPath, sprintf('%s%s1_frame_tac.csv', this.pnumber, tra)));
+            dcv = readtable(fullfile(this.sessionPath, sprintf('%s%s1%s.dcv', this.pnumber, tra, this.studyTag)), 'FileType', 'text');
+            try
+                tac = readtable(fullfile(this.sessionPath, sprintf('%s_%s1_frame_tac.csv', this.pnumber, tra)));
+            catch ME
+                handwarning(ME)
+                tac = readtable(fullfile(this.sessionPath, sprintf('%s%s1_frame_tac.csv', this.pnumber, tra)));                
+            end
             this.startTime = tac.Start(1);
             tac.Start = tac.Start - this.startTime;
             tac.End = tac.End - this.startTime;

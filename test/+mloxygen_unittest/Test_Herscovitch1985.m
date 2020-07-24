@@ -12,7 +12,8 @@ classdef Test_Herscovitch1985 < matlab.unittest.TestCase
  	
 	properties
         pwd0
- 		testObj
+ 		testObj        
+        xlsx
         
         a1 = 1.44003892234215e-06 
         a2 = 0.0039731579544141
@@ -130,11 +131,11 @@ classdef Test_Herscovitch1985 < matlab.unittest.TestCase
             oef.fsleyes()
         end
         function test_buildCmro2(this)
-            cmro2 = this.testObj.buildCmro2(1);
+            cmro2 = this.testObj.buildCmro2();
             cmro2.fsleyes()
         end
         function test_buildAll(this)
-            this.testObj.buildCmro2(1);
+            this.testObj.buildCmro2();
             
             this.testObj.imagingContextCbf.fsleyes()
             this.testObj.imagingContextCbf.save()
@@ -144,6 +145,138 @@ classdef Test_Herscovitch1985 < matlab.unittest.TestCase
             this.testObj.imagingContextCmro2.save()
             this.testObj.imagingContextOef.fsleyes()
             this.testObj.imagingContextOef.save()
+        end
+        function test_buildWholebrain(this)
+            import mlfourd.ImagingContext2
+            o = this.testObj;
+            tbl = o.buildWholebrain('checkmask', true);
+            disp(tbl)
+            
+            %     PID       CBF1      CBV1     CMRO2_1       OEF1
+            %     ____    ________    _____    ________    _________
+            % 
+            %     7667    42.80746    5.358    2.485797    0.3601757
+            
+        end
+        function test_buildCohort(this)
+            cd('/Users/jjlee/Tmp/population_data_Herscovitch')
+            tbl = [];
+            for g = globFoldersT('p*')
+                pwd1 = pushd(g{1});
+                gnum = str2double(g{1}(2:end));
+                o2c = this.xlsx.O2Cont(this.xlsx.PID == gnum);
+                pie = this.xlsx.x2DPie(this.xlsx.PID == gnum);
+                o = mloxygen.Herscovitch1985('sessionPath', pwd, 'pie', pie, 'o2content', o2c);    
+                if abs(o.W - this.xlsx.wellcal(this.xlsx.PID == gnum)) < 0.2
+                    warning('mloxygen:ValueWarning', ...
+                        'discrepancy this.W -> %g', o.W - this.xlsx.wellcal(this.xlsx.PID == gnum))
+                end
+                o.buildCmro2();
+                o.imagingContextCbf.save()
+                o.imagingContextCbv.save()
+                o.imagingContextCmro2.save()
+                o.imagingContextOef.save()                
+                tbl = [tbl; o.buildWholebrain]; %#ok<AGROW>    
+                disp(tbl)
+                popd(pwd1);
+            end
+            writetable(tbl, 'test_buildCohort_Herscovitch.xlsx')
+        end
+        function test_buildCohort_Chaojie(this)
+            cd('/Users/jjlee/Tmp/population_data_Chaojie')
+            tbl = [];
+            for g = globFoldersT('p*')
+                pwd1 = pushd(g{1});
+                gnum = str2double(g{1}(2:end));
+                o2c = this.xlsx.O2Cont(this.xlsx.PID == gnum);
+                pie = this.xlsx.x2DPie(this.xlsx.PID == gnum);
+                o = mloxygen.Chaojie2020('sessionPath', pwd, 'pie', pie, 'o2content', o2c, 'studyTag', '_pop');    
+                o.buildCmro2();
+                o.imagingContextCbf.save()
+                o.imagingContextCbv.save()
+                o.imagingContextCmro2.save()
+                o.imagingContextOef.save()                
+                tbl = [tbl; o.buildWholebrain]; %#ok<AGROW>    
+                disp(tbl)
+                popd(pwd1);
+            end
+            writetable(tbl, 'test_buildCohort_Chaojie.xlsx')
+        end
+        function test_buildSingle(this)
+            cd('/Users/jjlee/Tmp/population_data_Herscovitch')
+            for g = {'p7667'}
+                pwd1 = pushd(g{1});
+                gnum = str2double(g{1}(2:end));
+                o2c = this.xlsx.O2Cont(this.xlsx.PID == gnum);
+                pie = this.xlsx.x2DPie(this.xlsx.PID == gnum);
+                o = mloxygen.Herscovitch1985('sessionPath', pwd, 'pie', pie, 'o2content', o2c);
+                o.buildCmro2();
+                o.imagingContextCbf.save()
+                o.imagingContextCbv.save()
+                o.imagingContextCmro2.save()
+                o.imagingContextOef.save()
+                tbl = o.buildWholebrain('checkmask', true);
+                disp(tbl)
+                
+                %     PID       CBF1      CBV1     CMRO2_1       OEF1   
+                %     ____    ________    _____    ________    _________
+                % 
+                %     7667    42.80746    5.358    2.485797    0.3601757
+    
+                popd(pwd1);
+            end            
+        end
+        function test_buildSingle_Chaojie(this)
+            cd('/Users/jjlee/Tmp/population_data_Chaojie')
+            for g = {'p7667'}
+                pwd1 = pushd(g{1});
+                gnum = str2double(g{1}(2:end));
+                o2c = this.xlsx.O2Cont(this.xlsx.PID == gnum);
+                pie = this.xlsx.x2DPie(this.xlsx.PID == gnum);
+                o = mloxygen.Chaojie2020('sessionPath', pwd, 'pie', pie, 'o2content', o2c, 'studyTag', '_pop');
+                o.buildCmro2();
+                o.imagingContextCbf.save()
+                o.imagingContextCbv.save()
+                o.imagingContextCmro2.save()
+                o.imagingContextOef.save()
+                tbl = o.buildWholebrain('checkmask', true);
+                disp(tbl)
+                
+                %     PID       CBF1        CBV1      CMRO2_1       OEF1       HO_shift    OO_shift
+                %     ____    ________    ________    ________    _________    ________    ________
+                % 
+                %     7667    29.31678    5.546002    1.415667    0.2920172       7           -2   
+    
+                popd(pwd1);
+            end            
+        end
+        function test_tracerScalingInNativeSpaces(this)
+            tra = 'fdg';
+            
+            % assemble smooth dynamic tracer962 and make time-summed
+            tracerfp = [this.testObj.pnumber tra '1'];
+            tracer962 = mlfourd.ImagingContext2([tracerfp '.4dfp.hdr']);
+            tracer962.fsleyes()
+            tracer962.fileprefix = [tracer962.fileprefix '_962'];
+            tracer962.filesuffix = '.nii';
+            tracer962 = tracer962.timeSummed();
+            tracer962.fsleyes()
+            tracer962.save()
+            
+            % make dynamic tracernii time-summed            
+            tracernii = mlfourd.ImagingContext2([tracerfp '.nii']);
+            tracernii = tracernii.timeSummed();
+            tracernii.fsleyes()
+            tracernii.save()
+            
+            %  plot vectors of time-summed for inspecting correlations
+            tracer962_vec = reshape(tracer962.nifti.img, [128*128*63 1]);
+            tracernii_vec = reshape(tracernii.nifti.img, [128*128*63 1]);
+            plot(tracer962_vec, tracernii_vec, '.')
+            ylabel('PETobs NIfTI')
+            xlabel('PETobs 962to4dfp_framecheck')
+            title([upper(tra) ' time-summed'])
+            saveFigures(pwd, 'prefix', [this.testObj.pnumber '_' upper(tra) '_time_summed'], 'closeFigure', false)
         end
         function test_tacScaling(this)
             tra = 'oo';
@@ -209,18 +342,24 @@ classdef Test_Herscovitch1985 < matlab.unittest.TestCase
 
  	methods (TestClassSetup)
 		function setupHerscovitch1985(this)
-            sessp = fullfile(getenv('HOME'), 'Tmp', 'p7667');
-            this.testObj_ = mloxygen.Herscovitch1985('sessionPath', sessp, 'pie', 5.2705);
+            sessp = fullfile(getenv('HOME'), 'Tmp', 'population_data_Chaojie', 'p7667');
+            this.testObj_ = mloxygen.Chaojie2020('sessionPath', sessp, 'pie', 5.2705, 'o2content', 0.167, 'studyTag', '_pop');
+            %this.testObj_ = mloxygen.Herscovitch1985('sessionPath', sessp, 'pie', 5.2705, 'o2content', 0.167, 'studyTag', '');
             %sessp = fullfile(getenv('HOME'), 'Tmp', 'p7757');
-            %this.testObj_ = mloxygen.Herscovitch1985('sessionPath', sessp, 'pie', 5.3498); % 5.2705
+            %this.testObj_ = mloxygen.Herscovitch1985('sessionPath', sessp, 'pie', 5.35, 'o2content', 0.161);
+            %this.testObj_ = [];
+            
+            this.xlsx = readtable('/Users/jjlee/Box/Chaojie/np674_de-id_jjlee.xlsx');
  		end
 	end
 
  	methods (TestMethodSetup)
 		function setupHerscovitch1985Test(this)
             this.pwd0 = pwd;
-            cd(this.testObj_.sessionPath)
- 			this.testObj = copy(this.testObj_);
+            if ~isempty(this.testObj_)
+                cd(this.testObj_.sessionPath)
+                this.testObj = copy(this.testObj_);
+            end
  			this.addTeardown(@this.cleanTestMethod);
  		end
 	end
