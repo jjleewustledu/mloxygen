@@ -1,4 +1,4 @@
-classdef Herscovitch1985 < handle & matlab.mixin.Copyable 
+classdef Herscovitch1985 < handle & matlab.mixin.Copyable & mlpet.TracerKinetics
 	%% HERSCOVITCH1985 
     %  Uses:  asrow()
 
@@ -8,11 +8,7 @@ classdef Herscovitch1985 < handle & matlab.mixin.Copyable
  	%% It was developed on Matlab 9.8.0.1396136 (R2020a) Update 3 for MACI64.  Copyright 2020 John Joowon Lee.
  	
     properties (Constant)
-        LAMBDA = 0.95                % brain-blood equilibrium partition coefficient, mL/mL, Herscovitch, Raichle, JCBFM (1985) 5:65
-        DENSITY_BRAIN = 1.05         % assumed mean brain density, g/mL
-        RBC_FACTOR = 0.766           % per Tom Videen, metproc.inc, line 193  
-        RATIO_SMALL_LARGE_HCT = 0.85 % Grubb, et al., 1978               
-        
+        RATIO_SMALL_LARGE_HCT = 0.85 % Grubb, et al., 1978        
         CBF_UTHRESH = 200
         CBV_UTHRESH = 100
     end
@@ -64,13 +60,7 @@ classdef Herscovitch1985 < handle & matlab.mixin.Copyable
         W % well factor
     end
     
-    methods (Static) 
-        function cbf = invsToCbf(f)
-            cbf = 6000*f/mloxygen.Herscovitch1985.DENSITY_BRAIN;
-        end
-        function f = cbfToInvs(cbf)
-            f = cbf*mloxygen.Herscovitch1985.DENSITY_BRAIN/6000;
-        end
+    methods (Static)
         function metric = polynomialMetric(As, petobs)
             metric = petobs.^2*As(1) + petobs*As(2);
         end  

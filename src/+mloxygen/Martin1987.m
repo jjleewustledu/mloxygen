@@ -1,17 +1,10 @@
-classdef Martin1987 < handle & matlab.mixin.Copyable 
+classdef Martin1987 < handle & matlab.mixin.Copyable & mlpet.TracerKinetics
 	%% Martin1987  
 
 	%  $Revision$
  	%  was created 31-Oct-2018 15:20:13 by jjlee,
  	%  last modified $LastChangedDate$ and placed into repository /Users/jjlee/MATLAB-Drive/mloxygen/src/+mloxygen.
  	%% It was developed on Matlab 9.4.0.813654 (R2018a) for MACI64.  Copyright 2018 John Joowon Lee.
- 	
-    properties (Constant)
-        BLOOD_DENSITY = 1.06 % https://hypertextbook.com/facts/2004/MichaelShmukler.shtml; human whole blood 37 C
-        BRAIN_DENSITY = 1.05 % Torack et al., 1976
-        RATIO_SMALL_LARGE_HCT = 0.85 % Grubb, et al., 1978
-        PLASMA_DENSITY = 1.03
-    end
     
 	properties (Dependent)
         averageVoxels
@@ -129,6 +122,7 @@ classdef Martin1987 < handle & matlab.mixin.Copyable
  			%  @param T0 is numeric.
             %  @param Tf is numeric.
             %  @param ispercent is logical.
+            %  @param averageVoxels is logical.
 
             ip = inputParser;
             addParameter(ip, 'devkit', [], @(x) isa(x, 'mlpet.IDeviceKit'));
