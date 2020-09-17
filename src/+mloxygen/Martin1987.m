@@ -73,6 +73,7 @@ classdef Martin1987 < handle & matlab.mixin.Copyable & mlpet.TracerKinetics
                     trapz(this.T0:this.Tf, aif);
             else
                 s = this.scanner_.masked(ipr.roi);
+                % s = s.blurred(4.3); % for displaying AIF
                 times = s.times;
                 times = times(this.T0 <= s.times & s.times <= this.Tf);
                 tac = s.activityDensity();
@@ -110,6 +111,24 @@ classdef Martin1987 < handle & matlab.mixin.Copyable & mlpet.TracerKinetics
             this.scanner_.plot()
             title('Martin1987.buildQC().this.scanner_.plot()')
             this.scanner_.imagingContext.fsleyes()
+        end
+        function h = plot(this, varargin)
+            ip = inputParser;
+            addParameter(ip, 'index', [], @isnumeric)
+            addParameter(ip, 'roi', [])
+            parse(ip, varargin{:})
+            ipr = ip.Results;
+            ipr.roi = mlfourd.ImagingContext2(ipr.roi);
+            
+            a = this.arterial_;
+            s = this.scanner_;
+            
+            h = figure; 
+            plot(a.datetimes, a.activityDensity(), ':o', ...
+                s.datetimes, 10*s.activityDensity(), ':o')
+            ylabel('activity / (Bq/mL)')
+            legend('aif', '10x oc')
+            title(sprintf('mloxygen.Margin1987.plot():  index->%g', ipr.index))
         end
     end
     

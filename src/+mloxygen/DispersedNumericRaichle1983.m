@@ -32,7 +32,6 @@ classdef DispersedNumericRaichle1983 < handle & mloxygen.Raichle1983
             %  @return this.
             %  @return ho, blurred by ipr.blurHo.
             
-            import mloxygen.DispersedNumericRaichle1983.DTimeToShift
             import mloxygen.DispersedNumericRaichle1983.reshapeArterial
             import mloxygen.DispersedNumericRaichle1983.reshapeScanner
             
@@ -173,14 +172,14 @@ classdef DispersedNumericRaichle1983 < handle & mloxygen.Raichle1983
             if Dt < 0
                 aif = aif__(end)*ones(size(aif__));
                 aif(1:(length(aif__)+Dt)) = aif__((1-Dt):end);
-%                selection = aif > 0.01*max(aif);
-%                aif(selection) = 2^(-Dt/halflife)*aif(selection);
+                selection = aif > 0.01*max(aif);
+                aif(selection) = 2^(-Dt/halflife)*aif(selection);
                 return
             end
             aif = aif__(1)*ones(size(aif__));
             aif((1+Dt):end) = aif__(1:(end-Dt));
-%            selection = aif > 0.01*max(aif);
-%            aif(selection) = 2^(-Dt/halflife)*aif(selection);
+            selection = aif > 0.01*max(aif);
+            aif(selection) = 2^(-Dt/halflife)*aif(selection);
         end
     end
 

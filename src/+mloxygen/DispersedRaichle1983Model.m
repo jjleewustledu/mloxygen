@@ -25,9 +25,11 @@ classdef DispersedRaichle1983Model
             PS = ks(2);
             lambda = ks(3); 
             Delta = ks(4);
-            E = 1 - exp(-PS/f);
-            [~,idx] = max(artery_interpolated > 0.1*max(artery_interpolated));
-            n = min(length(artery_interpolated), idx+59); % limit duration of scan sampling
+            E = max(1 - exp(-PS/f), 0.7);
+            E = min(E, 0.93);
+            %[~,idx] = max(artery_interpolated > 0.1*max(artery_interpolated));            
+            %n = min(length(artery_interpolated), idx+119); % limit duration of scan sampling
+            n = length(artery_interpolated);
             times = 0:1:n-1;
              
             % use Delta
@@ -73,8 +75,9 @@ classdef DispersedRaichle1983Model
             m = containers.Map;
             m('k1') = struct('min', 0.000833, 'max', 0.028,  'init', 0.00777, 'sigma', 3.89e-4); % f / s
             m('k2') = struct('min', 0.00928,  'max', 0.0368, 'init', 0.0194,  'sigma', 0.002); % PS / s
+            %m('k2') = struct('min', 0.7,      'max', 0.93,   'init', 0.825,   'sigma', 0.05); % E_w
             m('k3') = struct('min', 0.797,    'max', 1.09,   'init', 0.945,   'sigma', 0.05); % lambda in mL/mL
-            m('k4') = struct('min', 0.1,      'max', 2,      'init', 1,       'sigma', 0.1); % Delta for cerebral dispersion
+            m('k4') = struct('min', 0.333,    'max', 2,      'init', 1,       'sigma', 0.1); % Delta for cerebral dispersion
         end
     end
 
@@ -110,7 +113,7 @@ classdef DispersedRaichle1983Model
                     this.map('k2') = struct('min', 0.00788,  'max', 0.0368,  'init', 0.0209,  'sigma', 0.002); % PS / s
                     this.map('k3') = struct('min', 0.955,    'max', 1.09,    'init', 1.02,    'sigma', 0.05); % lambda in mL/mL                    
                 case 'w'
-                    this.map('k2') = struct('min', 0.00928,  'max', 0.0215,  'init', 0.0139,  'sigma', 0.002); % PS / s
+                    this.map('k2') = struct('min', 0.0068,  'max', 0.0215,  'init', 0.0139,  'sigma', 0.002); % PS / s
                     this.map('k3') = struct('min', 0.797,    'max', 0.905,   'init', 0.851,   'sigma', 0.05); % lambda in mL/mL
                 case 's' % subcortical
                     this.map('k2') = struct('min', 0.0109,   'max', 0.0282,  'init', 0.0193,  'sigma', 0.002); % PS / s

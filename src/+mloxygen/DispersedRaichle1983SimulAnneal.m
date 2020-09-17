@@ -12,6 +12,7 @@ classdef DispersedRaichle1983SimulAnneal < mloxygen.Raichle1983SimulAnneal
             estimation  = sampled(ks, artery_interpolated, times_sampled);
             measurement = measurement(1:length(estimation));
             taus        = diff(times_sampled);
+            taus        = [taus taus(end)];
             taus        = taus(1:length(estimation));
             positive    = measurement > 0;
             e           = estimation .* taus;

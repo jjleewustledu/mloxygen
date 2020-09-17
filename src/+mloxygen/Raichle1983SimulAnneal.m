@@ -47,7 +47,7 @@ classdef Raichle1983SimulAnneal < mlpet.TracerSimulatedAnneal & mloxygen.Raichle
         end
         function fprintfModel(this)
             fprintf('Simulated Annealing:\n');
-            fprintf('\tE = 1 - exp(-PS/f) = %f\n', 1 - exp(-this.ks(2)/this.ks(1)))
+            %fprintf('\tE = 1 - exp(-PS/f) = %f\n', 1 - exp(-this.ks(2)/this.ks(1)))
             for ky = 1:length(this.ks)
                 fprintf('\tk%i = %f\n', ky, this.ks(ky));
             end
@@ -139,7 +139,7 @@ classdef Raichle1983SimulAnneal < mlpet.TracerSimulatedAnneal & mloxygen.Raichle
         end        
         function s    = sprintfModel(this)
             s = sprintf('Simulated Annealing:\n');
-            s = [s sprintf('\tE = 1 - exp(-PS/f) = %f\n', 1 - exp(-this.ks(2)/this.ks(1)))];
+            %s = [s sprintf('\tE = 1 - exp(-PS/f) = %f\n', 1 - exp(-this.ks(2)/this.ks(1)))];
             for ky = 1:length(this.ks)
                 s = [s sprintf('\tk%i = %f\n', ky, this.ks(ky))]; %#ok<AGROW>
             end
