@@ -39,40 +39,154 @@ classdef DispersedImagingRaichle1983 < handle & matlab.mixin.Copyable
     end
     
     methods (Static)
-        function this = createFromDeviceKit(devkit, varargin)
+        function this = createFromDeviceKit(varargin)
             %% makes no adjustments of AIF timing
-            %  @param required devkit is mlpet.IDeviceKit.
+            %  @param devkit is mlpet.IDeviceKit.
             %  @param ho is numeric, default from devkit.
             %  @param roi is understood by mlfourd.ImagingContext2.
             %  @param blurHo := {[], 0, 4.3, ...}
+            
+            import mloxygen.DispersedImagingRaichle1983.reshapeArterial
+            import mloxygen.DispersedImagingRaichle1983.reshapeScanner
             
             ip = inputParser;
             ip.KeepUnmatched = true;
             addRequired(ip, 'devkit', @(x) isa(x, 'mlpet.IDeviceKit'))
             addParameter(ip, 'ho', [], @isnumeric)
-            addParameter(ip, 'roi', [], @(x) ~isempty(x))
+            addParameter(ip, 'roi', 'brain.4dfp.hdr', @(x) ~isempty(x))
             addParameter(ip, 'blurHo', 4.3, @isnumeric)
             parse(ip, devkit, varargin{:})
             ipr = ip.Results;
             
             % scanner provides calibrations, ancillary data
-            
+             
             scanner = ipr.devkit.buildScannerDevice();
             scanner = scanner.blurred(ipr.blurHo);
-            ho = scanner.activityDensity(); % calibrated, decaying
+            [hoTimesMid,ho] = reshapeScanner(scanner);
             
             % AIF  
             
-            counting = ipr.devkit.buildCountingDevice();
-            aif = pchip(counting.times, counting.activityDensity(), 0:scanner.times(end));
+            arterial = ipr.devkit.buildArterialSamplingDevice(scanner);
+            [~,aif] = reshapeArterial(arterial, scanner);
             
+            hoTaus = diff(hoTimesMid);
+            hoTaus = [hoTaus hoTaus(end)];
             this = mloxygen.DispersedImagingRaichle1983( ...
-                devkit, ...
+                'devkit', devkit, ...
                 'ho', ho, ...
-                'taus', scanner.taus, ...
-                'times_sampled', scanner.timesMid, ...
+                'taus', hoTaus, ...
+                'times_sampled', hoTimesMid, ...
                 'artery_sampled', aif, ...
                 varargin{:});
+        end
+        function Dt = DTimeToShift(varargin)
+            %% Dt by which to shift arterial to match diff(scanner):  Dt < 0 will shift left; Dt > 0 will shift right.
+            
+            ip = inputParser;
+            addRequired(ip, 't_a')
+            addRequired(ip, 'activity_a')
+            addRequired(ip, 't_s')
+            addRequired(ip, 'activity_s')
+            parse(ip, varargin{:})
+            ipr = ip.Results;
+                        
+            t_a        = ipr.t_a;
+            activity_a = ipr.activity_a;
+            t_s        = ipr.t_s;
+            activity_s = ipr.activity_s;
+            
+            unif_t = 0:max([t_a t_s]);
+            unif_activity_s = pchip(t_s, activity_s, unif_t);
+            d_activity_s = diff(unif_activity_s); % uniformly sampled time-derivative
+            
+            % shift dcv in time to match inflow with dtac
+            [~,idx_a] = max(activity_a > 0.95*max(activity_a)); % idx_a ~ 35
+            [~,idx_s] = max(d_activity_s > 0.95*max(d_activity_s)); % idx_s ~ 35
+            Dt = unif_t(idx_s) - t_a(idx_a); % Dt ~ 5
+            if Dt < -t_a(idx_a)
+                warning('mloxygen:ValueError', ...
+                    'DispersedImagingRaichle1983.DTimeToShift.Dt -> %g; forcing -> %g', Dt, -t_a(idx_a))
+                Dt = -t_a(idx_a);
+            end
+            if Dt > t_a(end)
+                warning('mloxygen:ValueError', ...
+                    'DispersedImagingRaichle1983.DTimeToShift.Dt -> %g; forcing -> 0', Dt)
+                Dt = 0;
+            end
+        end        
+        function aif = extrapolateEarlyLateAif(aif__)
+            [~,idx0] = max(aif__ > 0.1*max(aif__));
+            idx0 = idx0 - 2;
+            baseline = mean(aif__(1:idx0));
+            [~,idxF] = max(flip(aif__) > baseline);
+            idxF = length(aif__) - idxF + 1;
+            
+            aif__ = aif__ - baseline;
+            aif__(aif__ < 0) = 0;
+            
+            selection = zeros(size(aif__));
+            selection(idx0:idxF) = 1;
+            aif = selection .* aif__;
+            lenLate = length(aif) - idxF;
+            halflife = 122.2416;
+            aif(idxF+1:end) = aif(idxF)*2.^(-(1:lenLate)/halflife);
+        end
+        function [aifTimes,aif,Dt] = reshapeArterial(arterial, scanner)
+            %% 1.  form uniform time coordinates consistent with scanner
+            %  2.  sample aif on uniform time coordinates
+            %  3.  infer & apply shift of worldline, Dt, for aif
+            
+            import mloxygen.DispersedImagingRaichle1983.DTimeToShift 
+            import mloxygen.DispersedImagingRaichle1983.extrapolateEarlyLateAif  
+            import mloxygen.DispersedImagingRaichle1983.reshapeScanner   
+            import mloxygen.DispersedImagingRaichle1983.shiftWorldlines            
+                        
+            [hoTimesMid,ho] = reshapeScanner(scanner); % hoTimesMid(1) ~ -5
+            aifTimes = hoTimesMid(1):hoTimesMid(end); % aifTimes ~ [-5 -4 -3 ... 569]       
+            hoDatetime0 = scanner.datetime0 + seconds(hoTimesMid(1)); % hoDatetime0 ~ 23-May-2019 12:04:20
+            aifDatetime0 = arterial.datetime0; % aifDatetime0 ~ 23-May-2019 12:03:59
+            Ddatetime = seconds(aifDatetime0 - hoDatetime0); % Ddatetime ~ -21
+            aifTimes__ = (arterial.time0:arterial.timeF) - arterial.time0 + Ddatetime + hoTimesMid(1); 
+            % aifTimes__ ~ [-26 -25 -24 ... 181]; satisfies 1.
+            
+            aif__ = arterial.activityDensity();
+            aif__ = extrapolateEarlyLateAif(aif__);
+            aif = makima([aifTimes__ aifTimes(end)], [aif__ 0], aifTimes); % satisfies 2.             
+            
+            ho_avgt = asrow(mean(mean(mean(ho, 1), 2), 3));
+            Dt = DTimeToShift(aifTimes, aif, hoTimesMid, ho_avgt);
+            aif = shiftWorldlines(aif, Dt);
+        end
+        function [timesMid,ho] = reshapeScanner(scanner)
+            %% prepends frames to scanner.activityDensity, the resamples
+            
+            timesMid_ = scanner.timesMid;
+            ho = scanner.activityDensity();
+            sz = size(ho);
+            hopp = zeros([sz(1:3) sz(4)+1]);
+            hopp(:,:,:,1) = zeros(sz(1:3));
+            hopp(:,:,:,2:end) - ho;
+            timesMid = [-flip(timesMid_(1:2)) timesMid_];
+            ho = makima([-timesMid_(2) timesMid_], hopp, timesMid);
+        end
+        function aif = shiftWorldlines(aif__, Dt)
+            if Dt == 0
+                aif = aif__;
+                return
+            end
+            
+            halflife = 122.2416;
+            if Dt < 0
+                aif = aif__(end)*ones(size(aif__));
+                aif(1:(length(aif__)+Dt)) = aif__((1-Dt):end);
+                selection = aif > 0.01*max(aif);
+                aif(selection) = 2^(-Dt/halflife)*aif(selection);
+                return
+            end
+            aif = aif__(1)*ones(size(aif__));
+            aif((1+Dt):end) = aif__(1:(end-Dt));
+            selection = aif > 0.01*max(aif);
+            aif(selection) = 2^(-Dt/halflife)*aif(selection);
         end
     end
 
@@ -240,9 +354,9 @@ classdef DispersedImagingRaichle1983 < handle & matlab.mixin.Copyable
     %% PROTECTED
     
 	methods (Access = protected)
-        function this = DispersedImagingRaichle1983(devkit, varargin)
+        function this = DispersedImagingRaichle1983(varargin)
             %% DispersedImagingRaichle1983
-            %  @param required devkit is mlpet.IDeviceKit.
+            %  @param devkit is mlpet.IDeviceKit.
             %  @param ho is understood by mlfourd.ImagingContext2.
             %  @param times_sampled from scanner is numeric.
             %  @param artery_sampled from counter is numeric.
@@ -250,7 +364,7 @@ classdef DispersedImagingRaichle1983 < handle & matlab.mixin.Copyable
             
             ip = inputParser;
             ip.KeepUnmatched = true;
-            addRequired(ip, 'devkit', @(x) isa(x, 'mlpet.IDeviceKit'))
+            addParameter(ip, 'devkit', @(x) isa(x, 'mlpet.IDeviceKit'))
             addParameter(ip, 'ho', [])
             addParameter(ip, 'taus', [], @isnumeric)
             addParameter(ip, 'times_sampled', [], @isnumeric)
@@ -264,7 +378,6 @@ classdef DispersedImagingRaichle1983 < handle & matlab.mixin.Copyable
             assert(4 == ndims(this.ho))
             this.taus = ipr.taus;
             this.times_sampled = ipr.times_sampled;  
-            this.hct = ipr.hct;
             
             % artery management            
             t = 0:this.times_sampled(end);

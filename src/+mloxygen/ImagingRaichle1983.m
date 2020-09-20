@@ -63,11 +63,11 @@ classdef ImagingRaichle1983 < handle & matlab.mixin.Copyable
             
             % AIF  
             
-            counting = ipr.devkit.buildCountingDevice();
-            aif = pchip(counting.times, counting.activityDensity(), 0:scanner.times(end));
+            arterial = ipr.devkit.buildArterialSamplingDevice(scanner);
+            aif = pchip(arterial.times, arterial.activityDensity(), 0:scanner.times(end));
             
             this = mloxygen.ImagingRaichle1983( ...
-                devkit, ...
+                'devkit', devkit, ...
                 'ho', ho, ...
                 'taus', scanner.taus, ...
                 'times_sampled', scanner.timesMid, ...
@@ -234,9 +234,9 @@ classdef ImagingRaichle1983 < handle & matlab.mixin.Copyable
     %% PROTECTED
     
 	methods (Access = protected)
-        function this = ImagingRaichle1983(devkit, varargin)
+        function this = ImagingRaichle1983(varargin)
             %% IMAGINGRaichle1983
-            %  @param required devkit is mlpet.IDeviceKit.
+            %  @param devkit is mlpet.IDeviceKit.
             %  @param ho is understood by mlfourd.ImagingContext2.
             %  @param times_sampled from scanner is numeric.
             %  @param artery_sampled from counter is numeric.
@@ -244,13 +244,13 @@ classdef ImagingRaichle1983 < handle & matlab.mixin.Copyable
             
             ip = inputParser;
             ip.KeepUnmatched = true;
-            addRequired(ip, 'devkit', @(x) isa(x, 'mlpet.IDeviceKit'))
+            addParameter(ip, 'devkit', @(x) isa(x, 'mlpet.IDeviceKit'))
             addParameter(ip, 'ho', [])
             addParameter(ip, 'taus', [], @isnumeric)
             addParameter(ip, 'times_sampled', [], @isnumeric)
             addParameter(ip, 'artery_sampled', [], @isnumeric)
             addParameter(ip, 'roi', [], @(x) ~isempty(x))
-            parse(ip, devkit, varargin{:})
+            parse(ip, varargin{:})
             ipr = ip.Results;
             
             this.devkit = ipr.devkit;
