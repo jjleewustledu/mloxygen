@@ -68,7 +68,7 @@ classdef DispersedNumericRaichle1983 < handle & mloxygen.Raichle1983
             
             fp = sprintf('mloygen_DispersedRaichle1983_createFromDeviceKit_dt%s', datestr(now, 'yyyymmddHHMMSS'));  
             this = mloxygen.DispersedNumericRaichle1983( ...
-                devkit, ...
+                'devkit', devkit, ...
                 'ho', ho, ...
                 'solver', 'simulanneal', ...
                 'times_sampled', hoTimesMid, ...
@@ -222,9 +222,9 @@ classdef DispersedNumericRaichle1983 < handle & mloxygen.Raichle1983
             ho = this.model.simulated(ipr.ks, 'aif', ipr.aif, 'Dt', this.Dt);
         end
         
- 		function this = DispersedNumericRaichle1983(devkit, varargin)
+ 		function this = DispersedNumericRaichle1983(varargin)
  			%% DISPERSEDNUMERICRAICHLE1983
-            %  @param required devkit is mlpet.IDeviceKit.
+            %  @param devkit is mlpet.IDeviceKit.
             %  @param ho is numeric.
             %  @param solver is in {'nest' 'simulanneal' 'hmc' 'lm' 'bfgs'}.
             %  @param blurHo := {[], 0, 4.3, ...}            
@@ -235,7 +235,7 @@ classdef DispersedNumericRaichle1983 < handle & mloxygen.Raichle1983
             %  @param fileprefix, default from devkit. 
             %  @param histology is char.
 
- 			this = this@mloxygen.Raichle1983(devkit, varargin{:});            
+ 			this = this@mloxygen.Raichle1983(varargin{:});            
             
             ip = inputParser;
             ip.KeepUnmatched = true;

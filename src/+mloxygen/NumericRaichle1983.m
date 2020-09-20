@@ -6,9 +6,6 @@ classdef NumericRaichle1983 < handle & mloxygen.Raichle1983
  	%  was created 10-Sep-2020 16:21:21 by jjlee,
  	%  last modified $LastChangedDate$ and placed into repository /Users/jjlee/MATLAB-Drive/mloxygen/src/+mloxygen.
  	%% It was developed on Matlab 9.7.0.1434023 (R2019b) Update 6 for MACI64.  Copyright 2020 John Joowon Lee.
- 	
-	properties 		
- 	end
     
     methods (Static)
         function [this,ho] = createFromDeviceKit(devkit, varargin)
@@ -65,7 +62,7 @@ classdef NumericRaichle1983 < handle & mloxygen.Raichle1983
             aif = reshapeArterial(arterialTimes, arterial.activityDensity(), scanner.timesMid);            
             fp = sprintf('mloygen_Raichle1983_createFromDeviceKit_dt%s', datestr(now, 'yyyymmddHHMMSS'));  
             this = mloxygen.NumericRaichle1983( ...
-                devkit, ...
+                'devkit', devkit, ...
                 'ho', ho, ...
                 'solver', 'simulanneal', ...
                 'times_sampled', timesMid1, ...
@@ -133,9 +130,9 @@ classdef NumericRaichle1983 < handle & mloxygen.Raichle1983
     end
 
 	methods		  
- 		function this = NumericRaichle1983(devkit, varargin)
+ 		function this = NumericRaichle1983(varargin)
  			%% NUMERICRAICHLE1983
-            %  @param required devkit is mlpet.IDeviceKit.
+            %  @param devkit is mlpet.IDeviceKit.
             %  @param ho is numeric.
             %  @param solver is in {'nest' 'simulanneal' 'hmc' 'lm' 'bfgs'}.
             %  @param blurHo := {[], 0, 4.3, ...}            
@@ -145,7 +142,7 @@ classdef NumericRaichle1983 < handle & mloxygen.Raichle1983
             %  @param sigma0, default from mloptimization.SimulatedAnnealing.
             %  @param fileprefix, default from devkit. 
 
- 			this = this@mloxygen.Raichle1983(devkit, varargin{:});	
+ 			this = this@mloxygen.Raichle1983(varargin{:});	
             
             ip = inputParser;
             ip.KeepUnmatched = true;

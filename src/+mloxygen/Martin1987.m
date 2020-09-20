@@ -1,4 +1,4 @@
-classdef Martin1987 < handle & matlab.mixin.Copyable & mlpet.TracerKinetics
+classdef Martin1987 < handle & mlpet.TracerKinetics
 	%% Martin1987  
 
 	%  $Revision$
@@ -9,7 +9,6 @@ classdef Martin1987 < handle & matlab.mixin.Copyable & mlpet.TracerKinetics
 	properties (Dependent)
         averageVoxels
         ispercent
-        sessionData
         T0 % integration limits
         Tf % integration limits
     end
@@ -33,9 +32,6 @@ classdef Martin1987 < handle & matlab.mixin.Copyable & mlpet.TracerKinetics
         end
         function g = get.ispercent(this)
             g = this.ispercent_;
-        end
-        function g = get.sessionData(this)
-            g = this.devkit_.sessionData;
         end
         function g = get.T0(this)
             g = this.T0_;
@@ -142,9 +138,11 @@ classdef Martin1987 < handle & matlab.mixin.Copyable & mlpet.TracerKinetics
             %  @param Tf is numeric.
             %  @param ispercent is logical.
             %  @param averageVoxels is logical.
+            
+            this = this@mlpet.TracerKinetics(varargin{:});
 
             ip = inputParser;
-            addParameter(ip, 'devkit', [], @(x) isa(x, 'mlpet.IDeviceKit'));
+            ip.KeepUnmatched = true;
             addParameter(ip, 'T0', nan, @isnumeric);
             addParameter(ip, 'Tf', nan, @isnumeric);
             addParameter(ip, 'ispercent', true, @islogical);
@@ -152,7 +150,6 @@ classdef Martin1987 < handle & matlab.mixin.Copyable & mlpet.TracerKinetics
             parse(ip, varargin{:});
             ipr = ip.Results;
  			
-            this.devkit_    = ipr.devkit;
             this.T0_        = ipr.T0;
             this.Tf_        = ipr.Tf;
             this.ispercent_ = ipr.ispercent;
@@ -173,11 +170,6 @@ classdef Martin1987 < handle & matlab.mixin.Copyable & mlpet.TracerKinetics
                 this.Tf_ = length(aif)-1;
             end
         end
-        function that = copyElement(this)
-            %%  See also web(fullfile(docroot, 'matlab/ref/matlab.mixin.copyable-class.html'))
-            
-            that = copyElement@matlab.mixin.Copyable(this);
-        end
     end 
     
     %% PRIVATE
@@ -186,7 +178,6 @@ classdef Martin1987 < handle & matlab.mixin.Copyable & mlpet.TracerKinetics
         averageVoxels_
         arterial_
         counting_
-        devkit_
         ispercent_
         scanner_
         T0_

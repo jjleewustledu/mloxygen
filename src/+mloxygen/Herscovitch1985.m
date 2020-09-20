@@ -1,4 +1,4 @@
-classdef Herscovitch1985 < handle & matlab.mixin.Copyable & mlpet.TracerKinetics
+classdef Herscovitch1985 < handle& mlpet.TracerKinetics
 	%% HERSCOVITCH1985 
     %  Uses:  asrow()
 

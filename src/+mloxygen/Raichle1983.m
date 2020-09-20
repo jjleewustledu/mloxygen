@@ -1,4 +1,4 @@
-classdef Raichle1983 < handle & matlab.mixin.Copyable 
+classdef Raichle1983 < handle & mlpet.TracerKinetics
 	%% RAICHLE1983 is the context to a strategy design patterns which implements:
     %  mloxygen.{Raichle1983Nest, Raichle1983SimulAnneal, Raichle1983HMC, Raichle1983LM, Raichle1983BFGS}.
     %  For performance considerations, see also https://blogs.mathworks.com/loren/2012/03/26/considering-performance-in-object-oriented-matlab-code/
@@ -7,35 +7,38 @@ classdef Raichle1983 < handle & matlab.mixin.Copyable
  	%  was created 30-May-2018 01:54:09 by jjlee,
  	%  last modified $LastChangedDate$ and placed into repository /Users/jjlee/MATLAB-Drive/mlpet/src/+mlpet.
  	%% It was developed on Matlab 9.4.0.813654 (R2018a) for MACI64.  Copyright 2018 John Joowon Lee.
- 	
-	properties
-        devkit
+ 	    
+    properties        
         Dt          % time-shift for AIF; Dt < 0 shifts backwards in time.
         measurement % expose for performance when used by mlglucose.Huang1980Strategy
         model       %
         regionTag 		
-    end    
+    end   
+    
+	properties (Dependent)
+        averageVoxels
+    end 
     
     methods (Static)
-        function this = createFromDeviceKit(devkit, varargin)
-            %% 
-            %  @param required devkit is mlpet.IDeviceKit.
-            %  @param Dt is numeric, s of time-shifting for AIF.
-            %  @param ho is numeric.
-            %  @param solver is in {'nest' 'simulanneal' 'hmc' 'lm' 'bfgs'}.
-            %  @param blurHo := {[], 0, 4.3, ...}            
-            %  @param map, default := mloxygen.Raichle1983Model.preferredMap().
-            %  @param times_sampled non-uniformly scheduled by the time-resolved PET reconstruction.
-            %  @param artery_interpolated, default from devkit.
-            %  @param sigma0, default from mloptimization.SimulatedAnnealing.
-            %  @param fileprefix, default from devkit. 
-            %  @return this.
-            
-            this = mloxygen.NumericRaichle1983.createFromDeviceKit(devkit, varargin{:});
+        function this = createFromDeviceKit(varargin)
+            this = mloxygen.Raichle1983(varargin{:});
         end
     end
     
     methods
+        
+        %% GET
+        
+        function g = get.averageVoxels(this)
+            g = this.averageVoxels_;
+        end
+        function     set.averageVoxels(this, s)
+            assert(islogical(s))
+            this.averageVoxels_ = s;
+        end
+        
+        %%
+        
         function ks = buildKs(this, varargin)
             this = solve(this, varargin{:});
             ks = [k1(this) k2(this) k3(this)];
@@ -71,30 +74,29 @@ classdef Raichle1983 < handle & matlab.mixin.Copyable
     %% PROTECTED
     
     properties (Access = protected)
+        averageVoxels_
         strategy_
     end
 
 	methods (Access = protected)		  
- 		function this = Raichle1983(devkit, varargin)
+ 		function this = Raichle1983(varargin)
             %% RAICHLE1983
-            %  @param required devkit is mlpet.IDeviceKit.
+            %  @param devkit is mlpet.IDeviceKit.
             %  @param Dt is numeric, s of time-shifting for AIF.
+            %  @param averageVoxels is logical, choosing creation of scalar results.
+            
+            this = this.mlpet.TracerKinetics(varargin{:});
             
             ip = inputParser;            
             ip.KeepUnmatched = true;
-            addRequired(ip, 'devkit', @(x) isa(x, 'mlpet.IDeviceKit'))
             addParameter(ip, 'Dt', 0, @isscalar)
+            addParameter(ip, 'averageVoxels', false, @islogical);
             parse(ip, devkit, varargin{:})
             ipr = ip.Results;
             
-            this.devkit = ipr.devkit;
             this.Dt = ipr.Dt;
-            this.regionTag = this.devkit.sessionData.regionTag;
-        end
-        function that = copyElement(this)
-            %%  See also web(fullfile(docroot, 'matlab/ref/matlab.mixin.copyable-class.html'))
-            
-            that = copyElement@matlab.mixin.Copyable(this);
+            this.averageVoxels_ = ipr.averageVoxels;
+            this.regionTag = this.devkit_.sessionData.regionTag;
         end
  	end 
 
