@@ -10,7 +10,7 @@ classdef Raichle1983 < handle & mlpet.TracerKinetics
  	    
     properties        
         Dt          % time-shift for AIF; Dt < 0 shifts backwards in time.
-        measurement % expose for performance when used by mlglucose.Huang1980Strategy
+        measurement % expose for performance when used by mloxygen.Raichle1983Strategy
         model       %
         regionTag 		
     end   
@@ -20,8 +20,10 @@ classdef Raichle1983 < handle & mlpet.TracerKinetics
     end 
     
     methods (Static)
-        function this = createFromDeviceKit(varargin)
-            this = mloxygen.Raichle1983(varargin{:});
+        function this = createFromDeviceKit(devkit, varargin)
+            sesd = devkit.sessionData;
+            sesd.jitOn222(sesd.ocOnAtlas())
+            this = mloxygen.Raichle1983('devkit', devkit, varargin{:});
         end
     end
     

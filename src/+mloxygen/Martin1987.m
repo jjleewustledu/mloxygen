@@ -15,6 +15,8 @@ classdef Martin1987 < handle & mlpet.TracerKinetics
     
     methods (Static)
         function this = createFromDeviceKit(devkit)
+            sesd = devkit.sessionData;
+            sesd.jitOn222(sesd.ocOnAtlas())
             this = mloxygen.Martin1987('devkit', devkit, 'T0', 120, 'TF', 240);
         end
     end
