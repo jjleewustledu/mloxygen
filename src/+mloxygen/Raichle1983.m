@@ -87,18 +87,30 @@ classdef Raichle1983 < handle & mlpet.TracerKinetics
             %  @param Dt is numeric, s of time-shifting for AIF.
             %  @param averageVoxels is logical, choosing creation of scalar results.
             
-            this = this.mlpet.TracerKinetics(varargin{:});
+            this = this@mlpet.TracerKinetics(varargin{:});
             
             ip = inputParser;            
             ip.KeepUnmatched = true;
             addParameter(ip, 'Dt', 0, @isscalar)
             addParameter(ip, 'averageVoxels', false, @islogical);
-            parse(ip, devkit, varargin{:})
+            addParameter(ip, 'model', [], @(x) isa(x, 'mloxygen.Raichle1983Model'))
+            addParameter(ip, 'times_sampled', [], @isnumeric)
+            addParameter(ip, 'artery_interpolated', [], @isnumeric)
+            parse(ip, varargin{:})
             ipr = ip.Results;
             
             this.Dt = ipr.Dt;
             this.averageVoxels_ = ipr.averageVoxels;
+            this.model = ipr.model;            
+            this.model = set_times_sampled(this.model, ipr.times_sampled);
+            this.model = set_artery_interpolated(this.model, ipr.artery_interpolated);
+            
             this.regionTag = this.devkit_.sessionData.regionTag;
+        end
+        function that = copyElement(this)
+            %%  See also web(fullfile(docroot, 'matlab/ref/matlab.mixin.copyable-class.html'))
+            
+            that = copyElement@matlab.mixin.Copyable(this);
         end
  	end 
 
