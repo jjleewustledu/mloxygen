@@ -19,7 +19,7 @@ classdef DispersedImagingRaichle1983 < handle & matlab.mixin.Copyable
         artery_plasma_interpolated
         devkit
         ho % scanner.activityDensity(), decaying & calibrated
-        fs % flow 1/s
+        metric % flow 1/s
         meanAbsError
         measurement % expose for performance when used by mloxygen.DispersedRaichle1983Strategy
         model       %
@@ -33,13 +33,15 @@ classdef DispersedImagingRaichle1983 < handle & matlab.mixin.Copyable
  		times_sampled
     end
     
-    properties (Dependent)        
+    properties (Dependent) 
+        petPointSpread
+        metricTag
         regionTag
         sessionData
     end
     
     methods (Static)
-        function this = createFromDeviceKit(varargin)
+        function this = createFromDeviceKit(devkit, varargin)
             %% makes no adjustments of AIF timing
             %  @param devkit is mlpet.IDeviceKit.
             %  @param ho is numeric, default from devkit.
@@ -55,7 +57,7 @@ classdef DispersedImagingRaichle1983 < handle & matlab.mixin.Copyable
             addParameter(ip, 'ho', [], @isnumeric)
             addParameter(ip, 'roi', 'brain.4dfp.hdr', @(x) ~isempty(x))
             addParameter(ip, 'blurHo', 4.3, @isnumeric)
-            parse(ip, varargin{:})
+            parse(ip, devkit, varargin{:})
             ipr = ip.Results;
             
             % scanner provides calibrations, ancillary data
@@ -162,12 +164,13 @@ classdef DispersedImagingRaichle1983 < handle & matlab.mixin.Copyable
             
             timesMid_ = scanner.timesMid;
             ho = scanner.activityDensity();
-            sz = size(ho);
-            hopp = zeros([sz(1:3) sz(4)+1]);
-            hopp(:,:,:,1) = zeros(sz(1:3));
-            hopp(:,:,:,2:end) - ho;
             timesMid = [-flip(timesMid_(1:2)) timesMid_];
-            ho = makima([-timesMid_(2) timesMid_], hopp, timesMid);
+            sz = size(ho);
+            sz_ = sz; 
+            sz_(end) = sz_(end) + 1;
+            ho_ = zeros(sz_);
+            ho_(:,:,:,2:sz_(end)) = ho;
+            ho = makima([-timesMid_(2) timesMid_], ho_, timesMid);
         end
         function aif = shiftWorldlines(aif__, Dt)
             if Dt == 0
@@ -194,6 +197,12 @@ classdef DispersedImagingRaichle1983 < handle & matlab.mixin.Copyable
         
         %% GET
         
+        function g = get.metricTag(this)
+            g = this.sessionData.metricTag;
+        end
+        function g = get.petPointSpread(this)
+            g = this.sessionData.petPointSpread;
+        end
         function g = get.regionTag(this)
             g = this.sessionData.regionTag;
         end
@@ -216,14 +225,16 @@ classdef DispersedImagingRaichle1983 < handle & matlab.mixin.Copyable
             % MAE
             ic = abs(copy(this.residual));
             ic = ic.timeAveraged('taus', this.taus);
-            ic.fileprefix = [hoDCorr.fileprefix this.regionTag '_MAE'];
+            ic.fileprefix = [hoDCorr.fileprefix this.metricTag this.regionTag '_MAE'];
+            ic = ic.blurred(this.petPointSpread);
             this.meanAbsError = ic;
             
             % NMAE
             hoAvgt = copy(hoDCorr);
             hoAvgt = hoAvgt.timeAveraged('taus', this.taus);         
             nic = copy(this.meanAbsError) ./ hoAvgt;
-            nic.fileprefix = [hoDCorr.fileprefix this.regionTag '_NMAE'];
+            nic.fileprefix = [hoDCorr.fileprefix this.metricTag this.regionTag '_NMAE'];
+            nic = nic.blurred(this.petPointSpread);
             this.normMeanAbsError = nic;
         end
         function ic = buildPrediction(this, varargin)
@@ -234,14 +245,14 @@ classdef DispersedImagingRaichle1983 < handle & matlab.mixin.Copyable
             parse(ip, varargin{:})
             ipr = ip.Results;
             
-            assert(~isempty(this.fs))
+            assert(~isempty(this.metric))
             sesd = this.devkit.sessionData;
             scanner = this.devkit.buildScannerDevice();
             
             % init working_ifc from hoOnAtlas
             % return existing if reuseExisting
             working_ifc = sesd.hoOnAtlas('typ', 'mlfourd.ImagingFormatContext');
-            fileprefix0 = [working_ifc.fileprefix this.regionTag '_predicted'];
+            fileprefix0 = [working_ifc.fileprefix this.metricTag this.regionTag '_predicted'];
             working_ifc.fileprefix = fileprefix0;
             sz = size(working_ifc);
             if ipr.reuseExisting && isfile(working_ifc.fqfilename)
@@ -253,13 +264,15 @@ classdef DispersedImagingRaichle1983 < handle & matlab.mixin.Copyable
             % represent prediction in R^2:  voxels^1 (x) times            
             fs_ = zeros(this.Nroi,this.LENF+1);
             for i = 1:this.LENF+1     
-                rate = this.fs.fourdfp.img(:,:,:,i);                
+                rate = this.metric.fourdfp.img(:,:,:,i);                
                 fs_(:, i) = rate(this.roibin);
             end         
             this.ensureModel() % without voxelwise adjustments of AIF timings  
-            img2d = zeros(this.Nroi, sz(4));          
+            img2d = zeros(this.Nroi, sz(4)); 
+            idx0 = length(this.model.times_sampled) - sz(4); % N.B. includes extra early times lab frame
             for vxl = 1:this.Nroi                
-                img2d(vxl,:) = this.model.simulated(fs_(vxl,:)); % adjust AIF timings
+                sim = this.model.simulated(fs_(vxl,:)); % adjust AIF timings
+                img2d(vxl,:) = sim(1+idx0:sz(4)+idx0);
             end
             
             % embed prediction in R^4:  voxels^3 (x) times
@@ -283,71 +296,60 @@ classdef DispersedImagingRaichle1983 < handle & matlab.mixin.Copyable
             sesd = this.devkit.sessionData;
             hoDCorr = sesd.hoOnAtlas('typ', 'mlfourd.ImagingContext2');
             ic = this.prediction - hoDCorr;
-            ic.fileprefix = [hoDCorr.fileprefix this.regionTag  '_residual'];
+            ic.fileprefix = [hoDCorr.fileprefix this.metricTag this.regionTag  '_residual'];
+            ic = ic.blurred(6); % inspired by BOLD spatial scales
+            ic = ic .* this.prediction.binarized();
+            %this.residual = ic;
+        end
+        function ic = buildResidualWmparc1(this)
+            if isempty(this.prediction)
+                this.buildPrediction()
+            end            
+            sesd = this.devkit.sessionData;
+            hoDCorr = sesd.hoOnAtlas('typ', 'mlfourd.ImagingContext2');
+            ic = this.prediction - this.parcellateWithWmparc1(hoDCorr);
+            ic.fileprefix = [hoDCorr.fileprefix this.metricTag this.regionTag  '_residual'];
+            ic = ic .* this.prediction.binarized();
             this.residual = ic;
         end
         function this = ensureModel(this)
             %% without voxelwise adjustments of AIF timings
             
             if isempty(this.model)                               
-                map = mloxygen.DispersedRaichle1983Model.preferredMap();
-                this.model = mloxygen.DispersedRaichle1983Model( ...
-                    'map', map, ...
+                this.model = mloxygen.Raichle1983Model.createFromMetric( ...
+                    this.sessionData.metric, ...
                     'times_sampled', this.times_sampled, ...
                     'artery_interpolated', this.artery_plasma_interpolated);
             end            
         end
-        function this = solve(this)
-            ho_img_2d = this.projectedHoArray();
-            fs_img_2d = zeros(dipsum(this.roibin), 4);
-            map = mloxygen.DispersedRaichle1983Model.preferredMap();
+        function ic = parcellateWithWmparc1(this, ic)
             
-            for vxl = 1:this.Nroi
-                try
-                    tic
-                    fprintf('mloxygen.DispersedImagingRaichle1983.solve():  vxl->%i this.Nroi->%i\n', vxl, this.Nroi)
-                    this.measurement = ho_img_2d(vxl, :);
-                    if this.sufficientData(this.measurement)
-                        this.model = mloxygen.DispersedRaichle1983Model( ...
-                            'map', map, ...
-                            'times_sampled', this.times_sampled, ...
-                            'artery_interpolated', this.artery_plasma_interpolated);
-                        strategy = mloxygen.DispersedRaichle1983SimulAnneal('context', this);
-                        strategy = solve(strategy);
-                        
-                        % store latest solutions
-                        fs_img_2d(vxl, 1) = k1(strategy);
-                        fs_img_2d(vxl, 2) = k2(strategy);
-                        fs_img_2d(vxl, 3) = k3(strategy);
-                        fs_img_2d(vxl, 4) = k4(strategy);
-                        
-                        % use latest solutions for initial conditions for solving neighboring voxels
-                        map_k1 = map('k1'); % cache mapped struct
-                        map_k2 = map('k2');
-                        map_k3 = map('k3');    
-                        map_k4 = map('k4');                      
-                        map_k1.init = fs_img_2d(vxl, 1); % cached struct.init := latest solutions with jitter
-                        map_k2.init = fs_img_2d(vxl, 2);
-                        map_k3.init = fs_img_2d(vxl, 3);
-                        map_k4.init = fs_img_2d(vxl, 4);
-                        map('k1') = map_k1; % update mapped struct with adjusted cache
-                        map('k2') = map_k2;
-                        map('k3') = map_k3;
-                        map('k4') = map_k4;
-                    
-                        % else fs_img_2d retains zeros                        
-                    end                    
-                    toc
-                catch ME
-                    %handexcept(ME)
-                    handwarning(ME)
+            sesd = this.devkit.sessionData;
+            sesd.region = 'wmparc1';
+            wmparc1 = sesd.wmparc1OnAtlas('typ', 'mlfourd.ImagingContext2');
+            wmparc1_ = wmparc1.fourdfp;
+            
+            ic = ic.blurred(4.3);
+            ic = ic.masked(wmparc1.binarized);
+            ic_ = copy(ic.fourdfp);
+            ic_.fileprefix = [ic_.fileprefix '_parcWithWmparc1'];
+            img_ = reshape(ic_.img, [128*128*75 size(ic,4)]); % 2D
+            img__ = zeros(size(img_));
+            
+            indices = [1000:1035 2000:2035 3000:3035 4000:4035 5001:5002 6000 1:85 192:255];
+            for idx = indices
+                roibin_ = wmparc1_.img == idx;
+                roivec_ = reshape(roibin_, [128*128*75 1]);
+                if 0 == dipsum(roivec_)
+                    continue
+                end
+                
+                for t = 1:size(ic,4)
+                    img__(roivec_,t) = mean(img_(roivec_,t));
                 end
             end
-            
-            this.fs = this.invProjectedFsArray(fs_img_2d);
-        end
-        function tf = sufficientData(this, measurement)
-            tf = mean(measurement) > this.MAX_NORMAL_BACKGROUND;
+            ic_.img = reshape(img__, [128 128 75 size(ic,4)]);
+            ic = mlfourd.ImagingContext2(ic_);
         end
   	end 
 
@@ -370,7 +372,7 @@ classdef DispersedImagingRaichle1983 < handle & matlab.mixin.Copyable
             addParameter(ip, 'times_sampled', [], @isnumeric)
             addParameter(ip, 'artery_sampled', [], @isnumeric)
             addParameter(ip, 'roi', [], @(x) ~isempty(x))
-            parse(ip, devkit, varargin{:})
+            parse(ip, varargin{:})
             ipr = ip.Results;
             
             this.devkit = ipr.devkit;
@@ -380,7 +382,7 @@ classdef DispersedImagingRaichle1983 < handle & matlab.mixin.Copyable
             this.times_sampled = ipr.times_sampled;  
             
             % artery management            
-            t = 0:this.times_sampled(end);
+            t = this.times_sampled(1):this.times_sampled(end);
             this.artery_plasma_interpolated = pchip(0:length(ipr.artery_sampled)-1, ipr.artery_sampled, t);
             
             this.roi = mlfourd.ImagingContext2(ipr.roi);
@@ -393,30 +395,12 @@ classdef DispersedImagingRaichle1983 < handle & matlab.mixin.Copyable
             
             that = copyElement@matlab.mixin.Copyable(this);
         end
-        function ic = invProjectedFsArray(this, arr)
-            img = zeros([size(this.roibin) this.LENF]);
-            for i = 1:this.LENF
-                cube = img(:,:,:,i);
-                cube(this.roibin) = arr(:,i); 
-                img(:,:,:,i) = cube;
-            end
-            fp = strrep(this.ho.fileprefix, 'ho', 'fs'); % sprintf('fs_%s_', this.roi.fileprefix));
-            ic = mlfourd.ImagingContext2(img, 'filename', [fp '_' this.roi.fileprefix '.4dfp.hdr'], 'mmppix', [2 2 2]);
-        end
         function ic = masked(this, ic)
             %% retains original fileprefix.
             
             fp = ic.fileprefix;
             ic = ic.masked(this.roi);
             ic.fileprefix = fp;
-        end
-        function arr = projectedHoArray(this)
-            Nt = size(this.ho, 4);            
-            arr = zeros(dipsum(this.roibin), Nt);
-            for it = 1:Nt
-                cube = this.ho.fourdfp.img(:,:,:,it);
-                arr(:,it) = cube(this.roibin);
-            end
         end
   	end 
 
