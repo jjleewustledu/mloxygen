@@ -5,18 +5,6 @@ classdef Raichle1983SimulAnneal < mlpet.TracerSimulatedAnneal & mloxygen.Raichle
  	%  was created 10-Sep-2020 19:43:31 by jjlee,
  	%  last modified $LastChangedDate$ and placed into repository /Users/jjlee/MATLAB-Drive/mloxygen/src/+mloxygen.
  	%% It was developed on Matlab 9.7.0.1434023 (R2019b) Update 6 for MACI64.  Copyright 2020 John Joowon Lee.
-    
-    methods (Static)
-        function loss = loss_function(ks, artery_interpolated, times_sampled, measurement, sigma0)
-            import mloxygen.Raichle1983Model.sampled            
-            estimation  = sampled(ks, artery_interpolated, times_sampled);
-            positive    = measurement > 0.05*max(measurement);            
-            Q           = sum(estimation(positive) - measurement(positive)).^2;
-            %eoverm      = estimation(positive)./measurement(positive);
-            %Q           = sum((1 - eoverm).^2);
-            loss        = 0.5*Q/sigma0^2; % + sum(log(sigma0*measurement)); % sigma ~ sigma0*measurement
-        end
-    end
 
 	methods
  		function this = Raichle1983SimulAnneal(varargin)
@@ -65,6 +53,9 @@ classdef Raichle1983SimulAnneal < mlpet.TracerSimulatedAnneal & mloxygen.Raichle
         function [k,sk] = k3(this, varargin)
             [k,sk] = find_result(this, 'k3');
         end 
+        function [k,sk] = k4(this, varargin)
+            [k,sk] = find_result(this, 'k4');
+        end 
         function h = plot(this, varargin)
             ip = inputParser;
             addParameter(ip, 'showAif', true, @islogical)
@@ -101,16 +92,23 @@ classdef Raichle1983SimulAnneal < mlpet.TracerSimulatedAnneal & mloxygen.Raichle
             save(fn, this);
         end
         function this = solve(this, varargin)
-            import mloxygen.Raichle1983SimulAnneal.loss_function   
+            ip = inputParser;
+            addRequired(ip, 'loss_function', @(x) isa(x, 'function_handle'))
+            parse(ip, varargin{:})
+            ipr = ip.Results;
+            
             options_fmincon = optimoptions('fmincon', ...
-                'FunctionTolerance', 1e-9, ...
-                'OptimalityTolerance', 1e-9);
+                'FunctionTolerance', 1e-12, ...
+                'OptimalityTolerance', 1e-12, ...
+                'TolCon', 1e-14, ...
+                'TolX', 1e-14);
             if this.visualize_anneal
                 options = optimoptions('simulannealbnd', ...
                     'AnnealingFcn', 'annealingboltz', ...
                     'FunctionTolerance', eps, ...
                     'HybridFcn', {@fmincon, options_fmincon}, ...
                     'InitialTemperature', 20, ...
+                    'MaxFunEvals', 50000, ...
                     'ReannealInterval', 200, ...
                     'TemperatureFcn', 'temperatureexp', ...
                     'Display', 'diagnose', ...
@@ -121,11 +119,12 @@ classdef Raichle1983SimulAnneal < mlpet.TracerSimulatedAnneal & mloxygen.Raichle
                     'FunctionTolerance', eps, ...
                     'HybridFcn', {@fmincon, options_fmincon}, ...
                     'InitialTemperature', 20, ...
+                    'MaxFunEvals', 50000, ...
                     'ReannealInterval', 200, ...
                     'TemperatureFcn', 'temperatureexp');
             end
  			[ks_,sse,exitflag,output] = simulannealbnd( ...
-                @(ks__) loss_function( ...
+                @(ks__) ipr.loss_function( ...
                        ks__, this.artery_interpolated, this.times_sampled, double(this.Measurement), this.sigma0), ...
                 this.ks0, this.ks_lower, this.ks_upper, options); 
             
@@ -136,7 +135,7 @@ classdef Raichle1983SimulAnneal < mlpet.TracerSimulatedAnneal & mloxygen.Raichle
             if this.visualize
                 plot(this)
             end
-        end        
+        end       
         function s    = sprintfModel(this)
             s = sprintf('Simulated Annealing:\n');
             %s = [s sprintf('\tE = 1 - exp(-PS/f) = %f\n', 1 - exp(-this.ks(2)/this.ks(1)))];

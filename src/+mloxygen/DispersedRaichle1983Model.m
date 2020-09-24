@@ -1,4 +1,4 @@
-classdef DispersedRaichle1983Model 
+classdef DispersedRaichle1983Model < mloxygen.Raichle1983Model
 	%% DISPERSEDRAICHLE1983MODEL provides model data and methods to the strategy design pattern comprising
     %  mloxygen.{Raichle1983, DispersedRaichle1983SimulAnneal}.
     %  It operates on single voxels or regions.  It includes a dispersion parameter $\Delta$:
@@ -9,24 +9,20 @@ classdef DispersedRaichle1983Model
  	%  last modified $LastChangedDate$ and placed into repository /Users/jjlee/MATLAB-Drive/mloxygen/src/+mloxygen.
  	%% It was developed on Matlab 9.7.0.1434023 (R2019b) Update 6 for MACI64.  Copyright 2020 John Joowon Lee.
  	
-	properties
-        artery_interpolated
- 		map
-        times_sampled 		
-    end
-    
     methods (Static)
         function qs       = solution(ks, artery_interpolated)
             %  @param artery_interpolated is uniformly with at high sampling freq. starting at time = 0.
 
+            import mlpet.AerobicGlycolysisKit
+            
             ALPHA = 0.005670305; % log(2)/halflife in 1/s
             
             f = ks(1);
             PS = ks(2);
             lambda = ks(3); 
             Delta = ks(4);
-            E = max(1 - exp(-PS/f), 0.7);
-            E = min(E, 0.93);
+            E = max(1 - exp(-PS/f), AerobicGlycolysisKit.E_MIN);
+            E = min(E, AerobicGlycolysisKit.E_MAX);
             %[~,idx] = max(artery_interpolated > 0.1*max(artery_interpolated));            
             %n = min(length(artery_interpolated), idx+119); % limit duration of scan sampling
             n = length(artery_interpolated);
@@ -41,28 +37,36 @@ classdef DispersedRaichle1983Model
             % use E, f, lambda
             qs = E*f*conv(exp(-E*f*times/lambda - ALPHA*times), artery_interpolated1);
             qs = qs(1:n);
-        end
+        end        
         function qs       = sampled(ks, artery_interpolated, times_sampled)
             %  @param artery_interpolated is uniformly sampled at high sampling freq.
             %  @param times_sampled are samples scheduled by the time-resolved PET reconstruction
             
             import mloxygen.DispersedRaichle1983Model.solution
             qs = solution(ks, artery_interpolated);
-            idx_sampled = floor(times_sampled - times_sampled(1)) + 1; % times_sampled(1) == 1
+            idx_sampled = floor(times_sampled - times_sampled(1)) + 1;
             idx_sampled = idx_sampled(idx_sampled <= length(qs));
             qs = qs(idx_sampled);
         end
-         
-        function logp = log_likelihood(Z, Sigma)
-            %% for Raichle1983HMC
-            
-            logp = sum(-log(Sigma) - 0.5*log(2*pi) - 0.5*Z.^2); % scalar
-        end
         function loss = simulanneal_objective(ks, artery_interpolated, times_sampled, qs0, sigma0)
-            import mloxygen.Raichle1983Model.sampled          
+            import mloxygen.DispersedRaichle1983Model.sampled          
             qs = sampled(ks, artery_interpolated, times_sampled);            
             loss = 0.5 * sum((1 - qs ./ qs0).^2) / sigma0^2; % + sum(log(sigma0*qs0)); % sigma ~ sigma0 * qs0
-        end   
+        end  
+        function loss = loss_function(ks, artery_interpolated, times_sampled, measurement, sigma0)
+            import mloxygen.DispersedRaichle1983Model.sampled            
+            estimation  = sampled(ks, artery_interpolated, times_sampled);
+            measurement = measurement(1:length(estimation));
+            taus        = diff(times_sampled);
+            taus        = [taus taus(end)];
+            taus        = taus(1:length(estimation));
+            positive    = measurement > 0;
+            e           = estimation .* taus;
+            m           = measurement .* taus;
+            eoverm      = e(positive)./m(positive);
+            Q           = sum((1 - eoverm).^2);
+            loss        = 0.5*Q/sigma0^2; % + sum(log(sigma0*measurement)); % sigma ~ sigma0*measurement
+        end  
         function m = preferredMap()
             %% init from Raichle J Nucl Med 24:790-798, 1983; Herscovitch JCBFM 5:65-69 1985; Herscovitch JCBFM 7:527s-542 1987
             %  PS in [0.0140 0.0245 0.0588] Hz for white, brain, grey;
@@ -73,50 +77,42 @@ classdef DispersedRaichle1983Model
             %  lambda described in Table 2
             
             m = containers.Map;
-            m('k1') = struct('min', 0.000833, 'max', 0.028,  'init', 0.00777, 'sigma', 3.89e-4); % f / s
-            m('k2') = struct('min', 0.00928,  'max', 0.0368, 'init', 0.0194,  'sigma', 0.002); % PS / s
-            %m('k2') = struct('min', 0.7,      'max', 0.93,   'init', 0.825,   'sigma', 0.05); % E_w
-            m('k3') = struct('min', 0.797,    'max', 1.09,   'init', 0.945,   'sigma', 0.05); % lambda in mL/mL
-            m('k4') = struct('min', 0.333,    'max', 2,      'init', 1,       'sigma', 0.1); % Delta for cerebral dispersion
+            m('k1') = struct('min', 0.0043, 'max', 0.0155, 'init', 0.00777, 'sigma', 3.89e-4); % f / s
+            m('k2') = struct('min', 0.0137, 'max', 0.0266, 'init', 0.0228,  'sigma', 0.002); % PS / s
+            m('k3') = struct('min', 0.608,  'max', 1.06,   'init', 0.945,   'sigma', 0.05); % lambda in mL/mL
+            m('k4') = struct('min', 0.1,    'max', 2,      'init', 1,       'sigma', 0.1); % Delta for cerebral dispersion
         end
     end
 
 	methods		  
- 		function this = DispersedRaichle1983Model(varargin)
- 			
+ 		function this = DispersedRaichle1983Model(varargin) 	
+            
+            this = this@mloxygen.Raichle1983Model(varargin{:});
+            
             ip = inputParser;
             ip.KeepUnmatched = true;
-            addParameter(ip, 'map', this.preferredMap(), @(x) isa(x, 'containers.Map'))
-            addParameter(ip, 'times_sampled', [], @isnumeric)
-            addParameter(ip, 'artery_interpolated', [], @isnumeric)
             addParameter(ip, 'histology', '', @ischar)
             parse(ip, varargin{:})
             ipr = ip.Results;
             
-            this.map = ipr.map;
             this = this.adjustMapForHistology(ipr.histology);
-            this.times_sampled = ipr.times_sampled;
-            if this.times_sampled(end)-this.times_sampled(1)+1 ~= length(ipr.artery_interpolated)
-                this.artery_interpolated = ...
-                    pchip(0:length(ipr.artery_interpolated)-1, ipr.artery_interpolated, this.times_sampled(1):this.times_sampled(end));
-            else
-                this.artery_interpolated = ipr.artery_interpolated;
-            end
         end
         
         function this = adjustMapForHistology(this, histology)
             %% use PS ranges from Herscovitch et al 1987 Table 2
-            %  use 2*sigma(lambda_gray) ~ 2*std(Herscovitch & Raichle 1987 Table 2)
             
             switch histology
                 case 'g'
-                    this.map('k2') = struct('min', 0.00788,  'max', 0.0368,  'init', 0.0209,  'sigma', 0.002); % PS / s
-                    this.map('k3') = struct('min', 0.955,    'max', 1.09,    'init', 1.02,    'sigma', 0.05); % lambda in mL/mL                    
+                    this.map('k2') = struct('min', 0.017,    'max', 0.0266,  'init', 0.0218,  'sigma', 0.002); % PS / s
+                    this.map('k3') = struct('min', 0.738,    'max', 1.06,    'init', 1.02,    'sigma', 0.05); % lambda in mL/mL  
+                    %this.map('k3') = struct('min', 0.987,    'max', 1.06,    'init', 1.02,    'sigma', 0.05); % lambda in mL/mL                    
                 case 'w'
-                    this.map('k2') = struct('min', 0.0068,  'max', 0.0215,  'init', 0.0139,  'sigma', 0.002); % PS / s
-                    this.map('k3') = struct('min', 0.797,    'max', 0.905,   'init', 0.851,   'sigma', 0.05); % lambda in mL/mL
+                    this.map('k2') = struct('min', 0.0137,   'max', 0.0142,  'init', 0.014,   'sigma', 0.002); % PS / s
+                    this.map('k3') = struct('min', 0.608,    'max', 0.882,   'init', 0.851,   'sigma', 0.05); % lambda in mL/mL
+                    %this.map('k3') = struct('min', 0.819,    'max', 0.882,   'init', 0.851,   'sigma', 0.05); % lambda in mL/mL
                 case 's' % subcortical
-                    this.map('k2') = struct('min', 0.0109,   'max', 0.0282,  'init', 0.0193,  'sigma', 0.002); % PS / s
+                    this.map('k2') = struct('min', 0.0159,   'max', 0.0215,  'init', 0.0187,  'sigma', 0.002); % PS / s
+                    this.map('k3') = struct('min', 0.738,    'max', 0.97,    'init', 0.924,   'sigma', 0.05); % lambda in mL/mL
                 otherwise
                     % noninformative
             end
@@ -135,12 +131,12 @@ classdef DispersedRaichle1983Model
             ipr = ip.Results;            
             
             ks = ipr.ks(1:4);
-            if length(ks) > 4
-                ipr.Dt = ks(5);
+            if length(ipr.ks) > 4
+                ipr.Dt = ipr.ks(5);
             end
             if ipr.Dt ~= 0
                 times = 0:length(ipr.aif)-1;
-                aif = pchip(times+ipr.Dt, ipr.aif, times);
+                aif = pchip(times - ipr.Dt, ipr.aif, times); % remove the delay Dt found by model
             else
                 aif = ipr.aif;
             end
