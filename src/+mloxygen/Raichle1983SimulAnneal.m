@@ -59,8 +59,9 @@ classdef Raichle1983SimulAnneal < mlpet.TracerSimulatedAnneal & mloxygen.Raichle
         function h = plot(this, varargin)
             ip = inputParser;
             addParameter(ip, 'showAif', true, @islogical)
-            addParameter(ip, 'xlim', [-5 200], @isnumeric)            
+            addParameter(ip, 'xlim', [-5 500], @isnumeric)            
             addParameter(ip, 'ylim', [], @isnumeric)
+            addParameter(ip, 'zoom', 1, @isnumeric)
             parse(ip, varargin{:})
             ipr = ip.Results;
             
@@ -69,13 +70,13 @@ classdef Raichle1983SimulAnneal < mlpet.TracerSimulatedAnneal & mloxygen.Raichle
             times = this.times_sampled;
             sampled = this.model.sampled(this.ks, aif, times);
             if ipr.showAif
-                plot(times, this.Measurement, ':o', ...
-                    times(1:length(sampled)), sampled, '-', ...
+                plot(times, ipr.zoom*this.Measurement, ':o', ...
+                    times(1:length(sampled)), ipr.zoom*sampled, '-', ...
                     0:length(aif)-1, aif, '--')                
                 legend('measurement', 'estimation', 'aif')
             else
-                plot(times, this.Measurement, 'o', ...
-                    times(1:length(sampled)), sampled, '-')                
+                plot(times, ipr.zoom*this.Measurement, 'o', ...
+                    times(1:length(sampled)), ipr.zoom*sampled, '-')                
                 legend('measurement', 'estimation')
             end
             if ~isempty(ipr.xlim); xlim(ipr.xlim); end
