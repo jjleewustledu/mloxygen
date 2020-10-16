@@ -20,25 +20,22 @@ classdef DispersedNumericRaichle1983 < handle & mloxygen.Raichle1983
             %% adjusts AIF timings for coincidence of inflow with tissue activity from scanner
             %  @param required devkit is mlpet.IDeviceKit.
             %  @param ho is numeric, default from devkit.
+            %  @param model is an mloxygen.Raichle1983Model.
             %  @param roi ...
             %  @param solver is in {'nest' 'simulanneal' 'hmc' 'lm' 'bfgs'}, default := 'simulanneal'.            
             %  @param blurHo := {[], 0, 4.3, ...}            
-            %  @param map, default := mloxygen.Raichle1983Model.preferredMap().
-            %  @param times_sampled non-uniformly scheduled by the time-resolved PET reconstruction.
-            %  @param artery_interpolated, default from devkit.
             %  @param sigma0, default from mloptimization.SimulatedAnnealing.
-            %  @param fileprefix, default from devkit.    
-            %  @param histology is char.
             %  @return this.
             %  @return ho, blurred by ipr.blurHo.
             
-            import mloxygen.DispersedNumericRaichle1983.reshapeArterial
-            import mloxygen.DispersedNumericRaichle1983.reshapeScanner
+            reshapeArterial = @mloxygen.DispersedNumericRaichle1983.reshapeArterial;
+            reshapeScanner = @mloxygen.DispersedNumericRaichle1983.reshapeScanner;
             
             ip = inputParser;
             ip.KeepUnmatched = true;
             addRequired(ip, 'devkit', @(x) isa(x, 'mlpet.IDeviceKit'))
             addParameter(ip, 'ho', [], @isnumeric)
+            addParameter(ip, 'model', [], @(x) isa(x, 'mloxygen.Raichle1983Model'))
             addParameter(ip, 'roi', 'brain.4dfp.hdr', @(x) isa(x, 'mlfourd.ImagingContext2'))
             addParameter(ip, 'blurHo', 4.3, @isnumeric)
             parse(ip, devkit, varargin{:})
@@ -66,15 +63,16 @@ classdef DispersedNumericRaichle1983 < handle & mloxygen.Raichle1983
             
             % assemble this
             
-            fp = sprintf('mloygen_DispersedRaichle1983_createFromDeviceKit_dt%s', datestr(now, 'yyyymmddHHMMSS'));  
+            ipr.model = set_times_sampled(ipr.model, hoTimesMid);
+            ipr.model = set_artery_interpolated(ipr.model, aif);
             this = mloxygen.DispersedNumericRaichle1983( ...
                 'devkit', devkit, ...
                 'ho', ho, ...
                 'solver', 'simulanneal', ...
+                'Dt', Dt, ...
+                'model', ipr.model, ...
                 'times_sampled', hoTimesMid, ...
                 'artery_interpolated', aif, ...
-                'Dt', Dt, ...
-                'fileprefix', fp, ...
                 varargin{:});
         end
         function Dt = DTimeToShift(varargin)
@@ -93,18 +91,18 @@ classdef DispersedNumericRaichle1983 < handle & mloxygen.Raichle1983
             t_s        = ipr.t_s;
             activity_s = ipr.activity_s;
             
-            unif_t = 0:max([t_a t_s]);
-            unif_activity_s = pchip(t_s, activity_s, unif_t);
+            unif_t = min([t_a t_s]):max([t_a t_s]);
+            unif_activity_s = makima(t_s, activity_s, unif_t);
             d_activity_s = diff(unif_activity_s); % uniformly sampled time-derivative
             
             % shift dcv in time to match inflow with dtac
-            [~,idx_a] = max(activity_a > 0.95*max(activity_a)); % idx_a ~ 35
-            [~,idx_s] = max(d_activity_s > 0.95*max(d_activity_s)); % idx_s ~ 35
+            [~,idx_a] = max(activity_a > 0.1*max(activity_a)); % idx_a ~ 35
+            [~,idx_s] = max(d_activity_s > 0.1*max(d_activity_s)); % idx_s ~ 35
             Dt = unif_t(idx_s) - t_a(idx_a); % Dt ~ 5
-            if Dt < -t_a(idx_a)
+            if Dt < -abs(t_a(idx_a))
                 warning('mloxygen:ValueError', ...
                     'DispersedNumericRaichle1983.DTimeToShift.Dt -> %g; forcing -> %g', Dt, -t_a(idx_a))
-                Dt = -t_a(idx_a);
+                Dt = -abs(t_a(idx_a));
             end
             if Dt > t_a(end)
                 warning('mloxygen:ValueError', ...
@@ -127,21 +125,22 @@ classdef DispersedNumericRaichle1983 < handle & mloxygen.Raichle1983
             aif = selection .* aif__;
             lenLate = length(aif) - idxF;
             halflife = 122.2416;
-            aif(idxF+1:end) = aif(idxF)*2.^(-(1:lenLate)/halflife);
+            aifTransition = mean(aif(idxF-10:idxF));
+            aif(idxF+1:end) = aifTransition*2.^(-(1:lenLate)/halflife);
         end
         function [aifTimes,aif,Dt] = reshapeArterial(arterial, scanner)
             %% 1.  form uniform time coordinates consistent with scanner
             %  2.  sample aif on uniform time coordinates
             %  3.  infer & apply shift of worldline, Dt, for aif
             
-            import mloxygen.DispersedNumericRaichle1983.DTimeToShift 
-            import mloxygen.DispersedNumericRaichle1983.extrapolateEarlyLateAif  
-            import mloxygen.DispersedNumericRaichle1983.reshapeScanner   
-            import mloxygen.DispersedNumericRaichle1983.shiftWorldlines            
+            DTimeToShift = @mloxygen.DispersedNumericRaichle1983.DTimeToShift;
+            extrapolateEarlyLateAif = @mloxygen.DispersedNumericRaichle1983.extrapolateEarlyLateAif;
+            reshapeScanner = @mloxygen.DispersedNumericRaichle1983.reshapeScanner;
+            shiftWorldlines = @mloxygen.DispersedNumericRaichle1983.shiftWorldlines;
                         
-            [hoTimesMid,ho] = reshapeScanner(scanner); % hoTimesMid(1) ~ -5
-            aifTimes = hoTimesMid(1):hoTimesMid(end); % aifTimes ~ [-5 -4 -3 ... 569]       
-            hoDatetime0 = scanner.datetime0 + seconds(hoTimesMid(1)); % hoDatetime0 ~ 23-May-2019 12:04:20
+            [hoTimesMid,ho,hoTimeMin] = reshapeScanner(scanner); % hoTimesMid(1) ~ 0; hoTimeMin ~ -5
+            aifTimes = hoTimesMid(1):hoTimesMid(end); % aifTimes ~ [0 ... 574]
+            hoDatetime0 = scanner.datetime0 + seconds(hoTimeMin); % hoDatetime0 ~ 23-May-2019 12:04:20
             aifDatetime0 = arterial.datetime0; % aifDatetime0 ~ 23-May-2019 12:03:59
             Ddatetime = seconds(aifDatetime0 - hoDatetime0); % Ddatetime ~ -21
             aifTimes__ = (arterial.time0:arterial.timeF) - arterial.time0 + Ddatetime + hoTimesMid(1); 
@@ -154,13 +153,19 @@ classdef DispersedNumericRaichle1983 < handle & mloxygen.Raichle1983
             Dt = DTimeToShift(aifTimes, aif, hoTimesMid, ho);
             aif = shiftWorldlines(aif, Dt);
         end
-        function [timesMid,ho] = reshapeScanner(scanner)
-            %% prepends frames to scanner.activityDensity, the resamples
+        function [timesMid,ho,timeMin] = reshapeScanner(scanner)
+            %% prepends frames to scanner.activityDensity, then resamples
             
             timesMid_ = scanner.timesMid;
             ho = scanner.activityDensity();
+
+            % create timesMid < 0 & interpolated ho
             timesMid = [-flip(timesMid_(1:2)) timesMid_];
             ho = makima([-timesMid_(2) timesMid_], [0 ho], timesMid);
+            
+            % reset timesMid(1) := 0 while preserving sampling structure
+            timeMin = min(timesMid);
+            timesMid = timesMid - timeMin;
         end
         function aif = shiftWorldlines(aif__, Dt)
             if Dt == 0
@@ -228,12 +233,7 @@ classdef DispersedNumericRaichle1983 < handle & mloxygen.Raichle1983
             %  @param ho is numeric.
             %  @param solver is in {'nest' 'simulanneal' 'hmc' 'lm' 'bfgs'}.
             %  @param blurHo := {[], 0, 4.3, ...}            
-            %  @param map, default := mloxygen.Raichle1983Model.preferredMap().
-            %  @param times_sampled non-uniformly scheduled by the time-resolved PET reconstruction.
-            %  @param artery_interpolated, default from devkit.
             %  @param sigma0, default from mloptimization.SimulatedAnnealing.
-            %  @param fileprefix, default from devkit. 
-            %  @param histology is char.
 
  			this = this@mloxygen.Raichle1983(varargin{:});            
             
@@ -245,7 +245,6 @@ classdef DispersedNumericRaichle1983 < handle & mloxygen.Raichle1983
             ipr = ip.Results;
                         
             this.measurement = ipr.ho;
-            this.model = mloxygen.DispersedRaichle1983Model(varargin{:});
             switch lower(ipr.solver)
                 case 'simulanneal'
                     this.strategy_ = mloxygen.DispersedRaichle1983SimulAnneal( ...
@@ -253,7 +252,17 @@ classdef DispersedNumericRaichle1983 < handle & mloxygen.Raichle1983
                 otherwise
                     error('mloxygen:NotImplementedError', 'Raichle1983.ipr.solver->%s', ipr.solver)
             end
- 		end
+        end
+    end
+    
+    %% PROTECTED
+    
+    methods (Access = protected)
+        function that = copyElement(this)
+            %%  See also web(fullfile(docroot, 'matlab/ref/matlab.mixin.copyable-class.html'))
+            
+            that = copyElement@matlab.mixin.Copyable(this);
+        end
  	end 
 
 	%  Created with Newcl by John J. Lee after newfcn by Frank Gonzalez-Morphy
