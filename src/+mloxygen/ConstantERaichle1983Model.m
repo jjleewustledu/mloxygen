@@ -42,9 +42,8 @@ classdef ConstantERaichle1983Model < mloxygen.Raichle1983Model
             
             import mloxygen.ConstantERaichle1983Model.solution
             qs = solution(ks, artery_interpolated);
-            idx_sampled = floor(times_sampled - times_sampled(1)) + 1;
-            idx_sampled = idx_sampled(idx_sampled <= length(qs));
-            qs = qs(idx_sampled);
+            n = length(artery_interpolated);
+            qs = makima(0:n-1, qs, times_sampled);
         end
         function loss = simulanneal_objective(ks, artery_interpolated, times_sampled, qs0, sigma0)
             import mloxygen.ConstantERaichle1983Model.sampled          
@@ -64,7 +63,7 @@ classdef ConstantERaichle1983Model < mloxygen.Raichle1983Model
             m('k1') = struct('min', 0.0043, 'max', 0.0155, 'init', 0.00777, 'sigma', 3.89e-4); % f / s
             m('k2') = struct('min', 0.0137, 'max', 0.0266, 'init', 0.0228,  'sigma', 0.002); % PS / s
             m('k3') = struct('min', 0.608,  'max', 1.06,   'init', 0.945,   'sigma', 0.05); % lambda in mL/mL
-            m('k4') = struct('min', 0.2,    'max', 3,      'init', 2,       'sigma', 0.1); % Delta for cerebral dispersion
+            m('k4') = struct('min', 0.08,   'max', 3,      'init', 2,       'sigma', 0.1); % Delta for cerebral dispersion
         end
         function loss = loss_function(ks, artery_interpolated, times_sampled, measurement, sigma0)
             import mloxygen.ConstantERaichle1983Model.sampled            
