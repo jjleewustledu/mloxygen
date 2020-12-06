@@ -16,7 +16,7 @@ classdef DispersedNumericRaichle1983 < handle & mloxygen.Raichle1983
     end
     
     methods (Static)
-        function [this,ho] = createFromDeviceKit(devkit, varargin)
+        function [this,ho,aif] = createFromDeviceKit(devkit, varargin)
             %% adjusts AIF timings for coincidence of inflow with tissue activity from scanner
             %  @param required devkit is mlpet.IDeviceKit.
             %  @param ho is numeric, default from devkit.
@@ -27,6 +27,7 @@ classdef DispersedNumericRaichle1983 < handle & mloxygen.Raichle1983
             %  @param sigma0, default from mloptimization.SimulatedAnnealing.
             %  @return this.
             %  @return ho, blurred by ipr.blurHo.
+            %  @return aif
             
             reshapeArterial = @mloxygen.DispersedNumericRaichle1983.reshapeArterial;
             reshapeScanner = @mloxygen.DispersedNumericRaichle1983.reshapeScanner;

@@ -1,6 +1,6 @@
 classdef Raichle1983 < handle & mlpet.TracerKinetics
 	%% RAICHLE1983 is the context to a strategy design patterns which implements:
-    %  mloxygen.{Raichle1983Nest, Raichle1983SimulAnneal, Raichle1983HMC, Raichle1983LM, Raichle1983BFGS}.
+    %  mloxygen.{Raichle1983Nest, Raichle1983SimulAnneal, Raichle1983LM}.
     %  For performance considerations, see also https://blogs.mathworks.com/loren/2012/03/26/considering-performance-in-object-oriented-matlab-code/
 
 	%  $Revision$
@@ -46,15 +46,23 @@ classdef Raichle1983 < handle & mlpet.TracerKinetics
             ks = [k1(this) k2(this) k3(this)];
         end
         function [k,sk] = k1(this, varargin)
+            %% k1 == f
+            
             [k,sk] = k1(this.strategy_, varargin{:});
         end
         function [k,sk] = k2(this, varargin)
+            %% k2 == PS
+            
             [k,sk] = k2(this.strategy_, varargin{:});
         end
         function [k,sk] = k3(this, varargin)
+            %% k3 == lambda
+            
             [k,sk] = k3(this.strategy_, varargin{:});
         end
         function [k,sk] = ks(this, varargin)
+            %% ks == [f PS lambda]
+            
             k = zeros(1,3);
             sk = zeros(1,3);
             [k(1),sk(1)] = k1(this.strategy_, varargin{:});
