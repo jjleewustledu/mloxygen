@@ -66,7 +66,7 @@ classdef DispersedImagingRaichle1983 < handle & matlab.mixin.Copyable
             scanner = scanner.blurred(ipr.blurHo);
             [hoTimesMid,ho] = reshapeScanner(scanner);
             
-            % AIF  
+            % arterial reshaping makes it quantitatively comparable to scanner
             
             arterial = ipr.devkit.buildArterialSamplingDevice(scanner);
             [~,aif] = reshapeArterial(arterial, scanner);
@@ -82,56 +82,10 @@ classdef DispersedImagingRaichle1983 < handle & matlab.mixin.Copyable
                 varargin{:});
         end
         function Dt = DTimeToShift(varargin)
-            %% Dt by which to shift arterial to match diff(scanner):  Dt < 0 will shift left; Dt > 0 will shift right.
-            
-            ip = inputParser;
-            addRequired(ip, 't_a')
-            addRequired(ip, 'activity_a')
-            addRequired(ip, 't_s')
-            addRequired(ip, 'activity_s')
-            parse(ip, varargin{:})
-            ipr = ip.Results;
-                        
-            t_a        = ipr.t_a;
-            activity_a = ipr.activity_a;
-            t_s        = ipr.t_s;
-            activity_s = ipr.activity_s;
-            
-            unif_t = 0:max([t_a t_s]);
-            unif_activity_s = pchip(t_s, activity_s, unif_t);
-            d_activity_s = diff(unif_activity_s); % uniformly sampled time-derivative
-            
-            % shift dcv in time to match inflow with dtac
-            [~,idx_a] = max(activity_a > 0.95*max(activity_a)); % idx_a ~ 35
-            [~,idx_s] = max(d_activity_s > 0.95*max(d_activity_s)); % idx_s ~ 35
-            Dt = unif_t(idx_s) - t_a(idx_a); % Dt ~ 5
-            if Dt < -t_a(idx_a)
-                warning('mloxygen:ValueError', ...
-                    'DispersedImagingRaichle1983.DTimeToShift.Dt -> %g; forcing -> %g', Dt, -t_a(idx_a))
-                Dt = -t_a(idx_a);
-            end
-            if Dt > t_a(end)
-                warning('mloxygen:ValueError', ...
-                    'DispersedImagingRaichle1983.DTimeToShift.Dt -> %g; forcing -> 0', Dt)
-                Dt = 0;
-            end
+            Dt = mloxygen.DispersedNumericRaichle1983.DTimeToShift(varargin{:});
         end        
         function aif = extrapolateEarlyLateAif(aif__)
-            [~,idx0] = max(aif__ > 0.1*max(aif__));
-            idx0 = idx0 - 2;
-            baseline = mean(aif__(1:idx0));
-            [~,idxF] = max(flip(aif__) > baseline);
-            idxF = length(aif__) - idxF + 1;
-            
-            aif__ = aif__ - baseline;
-            aif__(aif__ < 0) = 0;
-            
-            selection = zeros(size(aif__));
-            selection(idx0:idxF) = 1;
-            aif = selection .* aif__;
-            lenLate = length(aif) - idxF;
-            halflife = 122.2416;
-            aif(idxF+1:end) = aif(idxF)*2.^(-(1:lenLate)/halflife);
+            aif = mloxygen.DispersedNumericRaichle1983.extrapolateEarlyLateAif(aif__);
         end
         function [aifTimes,aif,Dt] = reshapeArterial(arterial, scanner)
             %% 1.  form uniform time coordinates consistent with scanner
@@ -160,7 +114,7 @@ classdef DispersedImagingRaichle1983 < handle & matlab.mixin.Copyable
             aif = shiftWorldlines(aif, Dt);
         end
         function [timesMid,ho] = reshapeScanner(scanner)
-            %% prepends frames to scanner.activityDensity, the resamples
+            %% prepends frames to scanner.activityDensity, then resamples
             
             timesMid_ = scanner.timesMid;
             ho = scanner.activityDensity();
@@ -173,23 +127,7 @@ classdef DispersedImagingRaichle1983 < handle & matlab.mixin.Copyable
             ho = makima([-timesMid_(2) timesMid_], ho_, timesMid);
         end
         function aif = shiftWorldlines(aif__, Dt)
-            if Dt == 0
-                aif = aif__;
-                return
-            end
-            
-            halflife = 122.2416;
-            if Dt < 0
-                aif = aif__(end)*ones(size(aif__));
-                aif(1:(length(aif__)+Dt)) = aif__((1-Dt):end);
-                selection = aif > 0.01*max(aif);
-                aif(selection) = 2^(-Dt/halflife)*aif(selection);
-                return
-            end
-            aif = aif__(1)*ones(size(aif__));
-            aif((1+Dt):end) = aif__(1:(end-Dt));
-            selection = aif > 0.01*max(aif);
-            aif(selection) = 2^(-Dt/halflife)*aif(selection);
+            aif = mloxygen.DispersedNumericRaichle1983.shiftWorldlines(aif__, Dt);
         end
     end
 
@@ -336,8 +274,7 @@ classdef DispersedImagingRaichle1983 < handle & matlab.mixin.Copyable
             img_ = reshape(ic_.img, [128*128*75 size(ic,4)]); % 2D
             img__ = zeros(size(img_));
             
-            indices = [1000:1035 2000:2035 3000:3035 4000:4035 5001:5002 6000 1:85 192:255];
-            for idx = indices
+            for idx = mlpet.AerobicGlycolysisKit.indices
                 roibin_ = wmparc1_.img == idx;
                 roivec_ = reshape(roibin_, [128*128*75 1]);
                 if 0 == dipsum(roivec_)

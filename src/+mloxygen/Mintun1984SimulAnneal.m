@@ -1,35 +1,60 @@
-classdef Raichle1983SimulAnneal < mlpet.TracerSimulAnneal & mloxygen.Raichle1983Strategy
-	%% RAICHLE1983SIMULANNEAL operates on single voxels/regions.
+classdef Mintun1984SimulAnneal < mlpet.TracerSimulAnneal & mloxygen.Mintun1984Strategy
+	%% MINTUN1984SIMULANNEAL operates on single voxels/regions. 
 
 	%  $Revision$
- 	%  was created 10-Sep-2020 19:43:31 by jjlee,
+ 	%  was created 07-Dec-2020 23:22:23 by jjlee,
  	%  last modified $LastChangedDate$ and placed into repository /Users/jjlee/MATLAB-Drive/mloxygen/src/+mloxygen.
- 	%% It was developed on Matlab 9.7.0.1434023 (R2019b) Update 6 for MACI64.  Copyright 2020 John Joowon Lee.
-
-	methods
- 		function this = Raichle1983SimulAnneal(varargin)
- 			%% RAICHLE1983SIMULANNEAL
-            %  @param context is mloxygen.Raichle1983.
+ 	%% It was developed on Matlab 9.9.0.1524771 (R2020b) Update 2 for MACI64.  Copyright 2020 John Joowon Lee.
+ 	
+	methods		  
+ 		function this = Mintun1984SimulAnneal(varargin)
+ 			%% MINTUN1984SIMULANNEAL
+            %  @param context is mloxygen.Mintun1984.
             %  @param sigma0.
             %  @param fileprefix.
-
+ 			
  			this = this@mlpet.TracerSimulAnneal(varargin{:});
             
             [this.ks_lower,this.ks_upper,this.ks0] = remapper(this);
             this.artery_interpolated = this.model.artery_interpolated;
-        end        
+        end
         
         function [k,sk] = k1(this, varargin)
             [k,sk] = find_result(this, 'k1');
         end
         function [k,sk] = k2(this, varargin)
             [k,sk] = find_result(this, 'k2');
-        end
-        function [k,sk] = k3(this, varargin)
-            [k,sk] = find_result(this, 'k3');
-        end 
-        function [k,sk] = k4(this, varargin)
-            [k,sk] = find_result(this, 'k4');
+        end        
+        function h = plot(this, varargin)
+            ip = inputParser;
+            addParameter(ip, 'showAif', true, @islogical)
+            addParameter(ip, 'xlim', [-5 500], @isnumeric)            
+            addParameter(ip, 'ylim', [], @isnumeric)
+            addParameter(ip, 'zoom', 1, @isnumeric)
+            parse(ip, varargin{:})
+            ipr = ip.Results;
+            
+            aif = this.artery_interpolated;
+            h = figure;
+            times = this.times_sampled;
+            sampled = this.model.sampled(this.ks, this.model.fs_Raichle_Martin, aif, times);
+            if ipr.showAif
+                plot(times, ipr.zoom*this.Measurement, ':o', ...
+                    times(1:length(sampled)), ipr.zoom*sampled, '-', ...
+                    0:length(aif)-1, aif, '--')                
+                legend('measurement', 'estimation', 'aif')
+            else
+                plot(times, ipr.zoom*this.Measurement, 'o', ...
+                    times(1:length(sampled)), ipr.zoom*sampled, '-')                
+                legend('measurement', 'estimation')
+            end
+            if ~isempty(ipr.xlim); xlim(ipr.xlim); end
+            if ~isempty(ipr.ylim); ylim(ipr.ylim); end
+            xlabel('times / s')
+            ylabel('activity / (Bq/mL)')
+            annotation('textbox', [.175 .25 .3 .3], 'String', sprintfModel(this), 'FitBoxToText', 'on', 'FontSize', 7, 'LineStyle', 'none')
+            dbs = dbstack;
+            title(dbs(1).name)
         end 
         function this = solve(this, varargin)
             ip = inputParser;
@@ -65,7 +90,7 @@ classdef Raichle1983SimulAnneal < mlpet.TracerSimulAnneal & mloxygen.Raichle1983
             end
  			[ks_,sse,exitflag,output] = simulannealbnd( ...
                 @(ks__) ipr.loss_function( ...
-                       ks__, this.artery_interpolated, this.times_sampled, double(this.Measurement), this.sigma0), ...
+                       ks__, double(this.model.fs_Raichle_Martin), this.artery_interpolated, this.times_sampled, double(this.Measurement), this.sigma0), ...
                 this.ks0, this.ks_lower, this.ks_upper, options); 
             
             this.results_ = struct('ks0', this.ks0, 'ks', ks_, 'sse', sse, 'exitflag', exitflag, 'output', output); 
@@ -75,7 +100,7 @@ classdef Raichle1983SimulAnneal < mlpet.TracerSimulAnneal & mloxygen.Raichle1983
             if this.visualize
                 plot(this)
             end
-        end 
+        end
  	end 
 
 	%  Created with Newcl by John J. Lee after newfcn by Frank Gonzalez-Morphy

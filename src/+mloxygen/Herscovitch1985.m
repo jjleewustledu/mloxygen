@@ -508,7 +508,7 @@ classdef Herscovitch1985 < handle& mlpet.TracerKinetics
             assert(isnumeric(cbf));
             
             import mloxygen.*;
-            f = Herscovitch1985.cbfToInvs(cbf);
+            f = Herscovitch1985.cbfToF1(cbf);
             [~,idx0] = max(dcv.dcv_well' > 2*dcv.dcv_well(1));
             time = dcv.time(idx0:end)'; % row
             activity = dcv.dcv_well(idx0:end)'; % row

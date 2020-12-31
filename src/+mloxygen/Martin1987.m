@@ -1,5 +1,5 @@
 classdef Martin1987 < handle & mlpet.TracerKinetics
-	%% Martin1987  
+	%% Martin1987 
 
 	%  $Revision$
  	%  was created 31-Oct-2018 15:20:13 by jjlee,
@@ -7,24 +7,39 @@ classdef Martin1987 < handle & mlpet.TracerKinetics
  	%% It was developed on Matlab 9.4.0.813654 (R2018a) for MACI64.  Copyright 2018 John Joowon Lee.
     
 	properties (Dependent)
-        averageVoxels
-        ispercent
+        aif
+        averageVoxels % logical
+        roi % mlfourd.ImagingContext2
         T0 % integration limits
         Tf % integration limits
     end
     
     methods (Static)
-        function this = createFromDeviceKit(devkit)
-            sesd = devkit.sessionData;
+        function [this,oo,aif] = createFromDeviceKit(devkit, varargin)            
+            ip = inputParser;
+            ip.KeepUnmatched = true;
+            addRequired(ip, 'devkit', @(x) isa(x, 'mlpet.IDeviceKit'))
+            addParameter(ip, 'roi', 'brain_222.4dfp.hdr')
+            addParameter(ip, 'averageVoxels', true, @islogical)
+            parse(ip, devkit, varargin{:})
+            ipr = ip.Results;
+            
+            sesd = ipr.devkit.sessionData;
             sesd.jitOn222(sesd.ocOnAtlas())
-            this = mloxygen.Martin1987('devkit', devkit, 'T0', 120, 'TF', 240);
+            this = mloxygen.Martin1987( ...
+                'devkit', ipr.devkit, 'averageVoxels', ipr.averageVoxels, 'roi', ipr.roi, 'T0', 120, 'TF', 240);
+            oo = this.scanner_.activityDensity();
+            aif = this.aif;
         end
     end
 
 	methods 
         
-        %% GET
+        %% GET, SET
         
+        function g = get.aif(this)
+            g = this.arterial_.activityDensity();
+        end
         function g = get.averageVoxels(this)
             g = this.averageVoxels_;
         end
@@ -32,8 +47,14 @@ classdef Martin1987 < handle & mlpet.TracerKinetics
             assert(islogical(s))
             this.averageVoxels_ = s;
         end
-        function g = get.ispercent(this)
-            g = this.ispercent_;
+        function g = get.roi(this)
+            g = this.roi_;
+        end    
+        function     set.roi(this, s)
+            if ~isempty(s)
+                this.roi_ = mlfourd.ImagingContext2(s);
+                this.roi_ = this.roi_.binarized();
+            end
         end
         function g = get.T0(this)
             g = this.T0_;
@@ -44,22 +65,23 @@ classdef Martin1987 < handle & mlpet.TracerKinetics
         
         %%
         
-        function v = buildCbv(this, varargin)
+        function cbv = buildCbv(this, varargin)
+            %  @param roi is ImagingContext2.
+            %  @param averageVoxels is logical.
+            %  @return cbv := numeric if averageVoxels;
+            %              := ImagingContext2 if not averageVoxels.  (DEPRECATED)
             
             ip = inputParser;
             ip.KeepUnmatched = true;
-            addParameter(ip, 'roi', [], @(x) isa(x, 'mlfourd.ImagingContext2'))
+            addParameter(ip, 'roi', this.roi, @(x) isa(x, 'mlfourd.ImagingContext2'))
             addParameter(ip, 'averageVoxels', this.averageVoxels, @islogical)
             parse(ip, varargin{:})
             ipr = ip.Results;
 
-            scale = 1/(this.RATIO_SMALL_LARGE_HCT * this.BRAIN_DENSITY * this.BLOOD_DENSITY );
-            if this.ispercent
-                scale = 100*scale;
-            end
-            aif = this.arterial_.activityDensity();
-            this.boundTfByAif(aif);
-            aif = aif(this.T0+1:this.Tf+1);
+            scale = 100/(this.RATIO_SMALL_LARGE_HCT * this.BRAIN_DENSITY);
+            aif_ = this.aif;
+            this.boundTfByAif(aif_);
+            aif_ = aif_(this.T0+1:this.Tf+1);
             
             if ipr.averageVoxels
                 s = this.scanner_.volumeAveraged(ipr.roi);
@@ -67,66 +89,80 @@ classdef Martin1987 < handle & mlpet.TracerKinetics
                 times = times(this.T0 <= s.times & s.times <= this.Tf);
                 tac = s.activityDensity();
                 tac = tac(this.T0 <= s.times & s.times <= this.Tf);
-                v = scale * trapz(times, tac)/ ...
-                    trapz(this.T0:this.Tf, aif);
+                cbv = scale * trapz(times, tac)/ ...
+                    trapz(this.T0:this.Tf, aif_);
             else
+                
+                %% DEPRECATED
+                
                 s = this.scanner_.masked(ipr.roi);
-                % s = s.blurred(4.3); % for displaying AIF
                 times = s.times;
                 times = times(this.T0 <= s.times & s.times <= this.Tf);
                 tac = s.activityDensity();
                 tac = tac(:,:,:,this.T0 <= s.times & s.times <= this.Tf);
                 tac = permute(tac, [4 1 2 3]);
                 img = scale * trapz(times, tac)/ ...
-                    trapz(this.T0:this.Tf, aif);
+                    trapz(this.T0:this.Tf, aif_);
                 img = squeeze(img);
                 ifc = this.scanner_.imagingContext.fourdfp;
                 ifc.img = img;
-                if this.ispercent
-                    ifc.fileprefix = this.sessionData.cbvOnAtlas('typ', 'fp');
-                else
-                    ifc.fileprefix = this.sessionData.v1OnAtlas('typ', 'fp');
-                end
-                v = mlfourd.ImagingContext2(ifc);
+                ifc.fileprefix = this.sessionData.cbvOnAtlas('typ', 'fp');
+                cbv = mlfourd.ImagingContext2(ifc);
             end
         end
-        function buildQC(this, varargin)
-
-            return
-            
-            ip = inputParser;
-            ip.KeepUnmatched = true;
-            addParameter(ip, 'roi', [], @(x) isa(x, 'mlfourd.ImagingContext2'))
-            addParameter(ip, 'cbv', [], @isnumeric)
-            parse(ip, varargin{:})
-            ipr = ip.Results;
-            
-            this.scanner_.masked(ipr.roi)            
-            disp(this.arterial_)
-            this.arterial_.plot()
-            title('Martin1987.buildQC().this.arterial_.plot()')
-            disp(this.scanner_)
-            this.scanner_.plot()
-            title('Martin1987.buildQC().this.scanner_.plot()')
-            this.scanner_.imagingContext.fsleyes()
+        function buildQC(~, varargin)
         end
         function h = plot(this, varargin)
             ip = inputParser;
             addParameter(ip, 'index', [], @isnumeric)
-            addParameter(ip, 'roi', [])
+            addParameter(ip, 'roi', this.roi)
+            addParameter(ip, 'zoom', 10, @isnumeric)
             parse(ip, varargin{:})
-            ipr = ip.Results;
+            ipr = ip.Results;            
             ipr.roi = mlfourd.ImagingContext2(ipr.roi);
             
             a = this.arterial_;
-            s = this.scanner_;
-            
+            s = this.scanner_;            
             h = figure; 
             plot(a.datetimes, a.activityDensity(), ':o', ...
-                s.datetimes, 10*s.activityDensity(), ':o')
+                 s.datetimes, ipr.zoom*s.activityDensity(), ':o')
             ylabel('activity / (Bq/mL)')
-            legend('aif', '10x oc')
-            title(sprintf('mloxygen.Margin1987.plot():  index->%g', ipr.index))
+            legend('aif', [num2str(ipr.zoom) 'x oc'])            
+            dbs = dbstack;
+            title(sprintf('%s: indices->%s\n%s', dbs(1).name, mat2str(ipr.index), ipr.roi.fileprefix))
+        end
+        function this = solve(this, varargin)
+            %  @param tags is char, e.g., '_wmparc1', '_wholebrain'
+            
+            ip = inputParser;
+            addParameter(ip, 'tags', ['_' this.sessionData.region], @ischar)
+            parse(ip, varargin{:})
+            ipr = ip.Results;
+            
+            cbv = this.roi.zeros;
+            cbv = cbv.fourdfp;
+            cbv.fileprefix = this.sessionData.cbvOnAtlas('typ', 'fp', 'tags', ipr.tags);            
+            cbv.img(logical(this.roi)) = this.buildCbv(varargin{:});
+            this.product_ = mlfourd.ImagingContext2(cbv);            
+        end
+        
+        %% products
+        
+        function obj = cbv(this, varargin)
+            ip = inputParser;
+            addParameter(ip, 'typ', 'mlfourd.ImagingContext2', @ischar)
+            parse(ip, varargin{:})
+            obj = imagingType(ip.Results.typ, this.product_);
+        end
+        function obj = v1(this, varargin)            
+            ip = inputParser;
+            addParameter(ip, 'typ', 'mlfourd.ImagingContext2', @ischar)
+            parse(ip, varargin{:})
+            
+            v1 = copy(this.product_.fourdfp);
+            v1.img = this.cbvToV1(v1.img);
+            v1.fileprefix = strrep(this.product_.fileprefix, 'cbv', 'v1');
+            obj = imagingType(ip.Results.typ, v1);
         end
     end
     
@@ -136,26 +172,29 @@ classdef Martin1987 < handle & mlpet.TracerKinetics
  		function this = Martin1987(varargin)
  			%% Martin1987
             %  @param devkit is mlpet.IDeviceKit.
+            %  @param averageVoxels is logical.
+            %  @param roi is understood by ImagingContext2.
  			%  @param T0 is numeric.
             %  @param Tf is numeric.
-            %  @param ispercent is logical.
-            %  @param averageVoxels is logical.
             
             this = this@mlpet.TracerKinetics(varargin{:});
 
             ip = inputParser;
             ip.KeepUnmatched = true;
+            addParameter(ip, 'averageVoxels', true, @islogical);
+            addParameter(ip, 'roi', [])
             addParameter(ip, 'T0', nan, @isnumeric);
             addParameter(ip, 'Tf', nan, @isnumeric);
-            addParameter(ip, 'ispercent', true, @islogical);
-            addParameter(ip, 'averageVoxels', true, @islogical);
             parse(ip, varargin{:});
             ipr = ip.Results;
  			
+            this.averageVoxels_ = ipr.averageVoxels;
+            if ~isempty(ipr.roi)
+                this.roi_ = mlfourd.ImagingContext2(ipr.roi);
+                this.roi_ = this.roi_.binarized();
+            end
             this.T0_        = ipr.T0;
             this.Tf_        = ipr.Tf;
-            this.ispercent_ = ipr.ispercent;
-            this.averageVoxels_ = ipr.averageVoxels;
             
             this.scanner_  = this.devkit_.buildScannerDevice();
             this.arterial_ = this.devkit_.buildArterialSamplingDevice(this.scanner_);
@@ -178,10 +217,11 @@ classdef Martin1987 < handle & mlpet.TracerKinetics
     
     properties (Access = private)
         averageVoxels_
-        arterial_
-        counting_
-        ispercent_
-        scanner_
+        arterial_ % := devkit
+        counting_ % := devkit
+        product_  % := cbv as mlfourd.ImagingContext2
+        roi_
+        scanner_ % := devkit
         T0_
         Tf_
     end

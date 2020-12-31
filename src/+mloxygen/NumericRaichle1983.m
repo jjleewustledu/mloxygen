@@ -8,21 +8,16 @@ classdef NumericRaichle1983 < handle & mloxygen.Raichle1983
  	%% It was developed on Matlab 9.7.0.1434023 (R2019b) Update 6 for MACI64.  Copyright 2020 John Joowon Lee.
     
     methods (Static)
-        function [this,ho] = createFromDeviceKit(devkit, varargin)
+        function [this,ho,aif] = createFromDeviceKit(devkit, varargin)
             %% adjusts AIF timings for coincidence of inflow with tissue activity from scanner
             %  @param required devkit is mlpet.IDeviceKit.
-            %  @param Dt is numeric, s of time-shifting for AIF.
             %  @param ho is numeric, default from devkit.
             %  @param solver is in {'nest' 'simulanneal' 'hmc' 'lm' 'bfgs'}, default := 'simulanneal'.
             %  @param roi ...
-            %  @param blurHo := {[], 0, 4.3, ...}
-            %  @param map, default := mloxygen.Raichle1983Model.preferredMap().
-            %  @param times_sampled non-uniformly scheduled by the time-resolved PET reconstruction.
-            %  @param artery_interpolated, default from devkit.
-            %  @param sigma0, default from mloptimization.SimulatedAnnealing.
-            %  @param fileprefix, default from devkit.            
+            %  @param blurHo := {[], 0, 4.3, ...}          
             %  @return this.
             %  @return ho, blurred by ipr.blurHo.
+            %  @return aif.
             
             import mloxygen.NumericRaichle1983.DTimeToShift
             import mloxygen.NumericRaichle1983.reshapeArterial
@@ -32,7 +27,7 @@ classdef NumericRaichle1983 < handle & mloxygen.Raichle1983
             ip.KeepUnmatched = true;
             addRequired(ip, 'devkit', @(x) isa(x, 'mlpet.IDeviceKit'))
             addParameter(ip, 'ho', [], @isnumeric)
-            addParameter(ip, 'roi', 'brain.4dfp.hdr', @(x) isa(x, 'mlfourd.ImagingContext2'))
+            addParameter(ip, 'roi', 'brain_222.4dfp.hdr')
             addParameter(ip, 'blurHo', 4.3, @isnumeric)
             parse(ip, devkit, varargin{:})
             ipr = ip.Results;
@@ -60,7 +55,7 @@ classdef NumericRaichle1983 < handle & mloxygen.Raichle1983
             Dt = DTimeToShift(arterial, scanner); % Dt ~ 5
             arterialTimes = arterial.times(arterial.index0:arterial.indexF) - arterial.time0 + Dt - Ddatetime; % ~ [-57 145]
             aif = reshapeArterial(arterialTimes, arterial.activityDensity(), scanner.timesMid);            
-            fp = sprintf('mloygen_Raichle1983_createFromDeviceKit_dt%s', datestr(now, 'yyyymmddHHMMSS'));  
+            fp = sprintf('mloygen_NumericRaichle1983_createFromDeviceKit_dt%s', datestr(now, 'yyyymmddHHMMSS'));  
             this = mloxygen.NumericRaichle1983( ...
                 'devkit', devkit, ...
                 'ho', ho, ...
@@ -69,6 +64,7 @@ classdef NumericRaichle1983 < handle & mloxygen.Raichle1983
                 'artery_interpolated', aif, ...
                 'Dt', Dt, ...
                 'fileprefix', fp, ...
+                'roi', roibin, ...
                 varargin{:});
         end
         function Dt = DTimeToShift(varargin)
@@ -129,18 +125,13 @@ classdef NumericRaichle1983 < handle & mloxygen.Raichle1983
         end
     end
 
-	methods		  
+    %% PROTECTED
+    
+	methods (Access = protected)
  		function this = NumericRaichle1983(varargin)
  			%% NUMERICRAICHLE1983
-            %  @param devkit is mlpet.IDeviceKit.
             %  @param ho is numeric.
             %  @param solver is in {'nest' 'simulanneal' 'hmc' 'lm' 'bfgs'}.
-            %  @param blurHo := {[], 0, 4.3, ...}            
-            %  @param map, default := mloxygen.Raichle1983Model.preferredMap().
-            %  @param times_sampled non-uniformly scheduled by the time-resolved PET reconstruction.
-            %  @param artery_interpolated, default from devkit.
-            %  @param sigma0, default from mloptimization.SimulatedAnnealing.
-            %  @param fileprefix, default from devkit. 
 
  			this = this@mloxygen.Raichle1983(varargin{:});	
             
@@ -170,11 +161,11 @@ classdef NumericRaichle1983 < handle & mloxygen.Raichle1983
                     this.strategy_ = mloxygen.Raichle1983BFGS( ...
                         'context', this, varargin{:});
                 otherwise
-                    error('mloxygen:NotImplementedError', 'Raichle1983.ipr.solver->%s', ipr.solver)
+                    error('mloxygen:NotImplementedError', 'NumericRaichle1983.ipr.solver->%s', ipr.solver)
             end
  		end
  	end 
 
 	%  Created with Newcl by John J. Lee after newfcn by Frank Gonzalez-Morphy
- end
+end
 

@@ -1,10 +1,10 @@
-classdef (Abstract) Raichle1983Strategy 
-	%% RAICHLE1983STRATEGY is the interface for concrete strategies used with mloxygen.Raichle1983.
+classdef (Abstract) Mintun1984Strategy 
+	%% MINTUN1984STRATEGY is the interface for concrete strategies used with mloxygen.Mintun1984.
 
 	%  $Revision$
- 	%  was created 10-Sep-2020 19:43:44 by jjlee,
+ 	%  was created 07-Dec-2020 23:28:15 by jjlee,
  	%  last modified $LastChangedDate$ and placed into repository /Users/jjlee/MATLAB-Drive/mloxygen/src/+mloxygen.
- 	%% It was developed on Matlab 9.7.0.1434023 (R2019b) Update 6 for MACI64.  Copyright 2020 John Joowon Lee.
+ 	%% It was developed on Matlab 9.9.0.1524771 (R2020b) Update 2 for MACI64.  Copyright 2020 John Joowon Lee.
  	
 	properties (Abstract)
         artery_interpolated
@@ -22,7 +22,6 @@ classdef (Abstract) Raichle1983Strategy
 	methods (Abstract)
         k1(this)
         k2(this)
-        k3(this)
         solve(this)
  	end 
 

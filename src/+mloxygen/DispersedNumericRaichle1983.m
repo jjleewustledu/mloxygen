@@ -10,24 +10,19 @@ classdef DispersedNumericRaichle1983 < handle & mloxygen.Raichle1983
         LENK = 4
     end
     
-    properties (Dependent)
-        artery_interpolated
-        times_sampled
-    end
-    
     methods (Static)
         function [this,ho,aif] = createFromDeviceKit(devkit, varargin)
             %% adjusts AIF timings for coincidence of inflow with tissue activity from scanner
             %  @param required devkit is mlpet.IDeviceKit.
             %  @param ho is numeric, default from devkit.
-            %  @param model is an mloxygen.Raichle1983Model.
+            %  @param model is an mloxygen.DispersedRaichle1983Model.
             %  @param roi ...
-            %  @param solver is in {'nest' 'simulanneal' 'hmc' 'lm' 'bfgs'}, default := 'simulanneal'.            
+            %  @param solver is in {'simulanneal'}, default := 'simulanneal'.            
             %  @param blurHo := {[], 0, 4.3, ...}            
             %  @param sigma0, default from mloptimization.SimulatedAnnealing.
             %  @return this.
             %  @return ho, blurred by ipr.blurHo.
-            %  @return aif
+            %  @return aif.
             
             reshapeArterial = @mloxygen.DispersedNumericRaichle1983.reshapeArterial;
             reshapeScanner = @mloxygen.DispersedNumericRaichle1983.reshapeScanner;
@@ -36,8 +31,8 @@ classdef DispersedNumericRaichle1983 < handle & mloxygen.Raichle1983
             ip.KeepUnmatched = true;
             addRequired(ip, 'devkit', @(x) isa(x, 'mlpet.IDeviceKit'))
             addParameter(ip, 'ho', [], @isnumeric)
-            addParameter(ip, 'model', [], @(x) isa(x, 'mloxygen.Raichle1983Model'))
-            addParameter(ip, 'roi', 'brain.4dfp.hdr', @(x) isa(x, 'mlfourd.ImagingContext2'))
+            addParameter(ip, 'model', [], @(x) isa(x, 'mloxygen.DispersedRaichle1983Model'))
+            addParameter(ip, 'roi', 'brain_222.4dfp.hdr')
             addParameter(ip, 'blurHo', 4.3, @isnumeric)
             parse(ip, devkit, varargin{:})
             ipr = ip.Results;
@@ -74,6 +69,7 @@ classdef DispersedNumericRaichle1983 < handle & mloxygen.Raichle1983
                 'model', ipr.model, ...
                 'times_sampled', hoTimesMid, ...
                 'artery_interpolated', aif, ...
+                'roi', ipr.roi, ...
                 varargin{:});
         end
         function Dt = DTimeToShift(varargin)
@@ -190,28 +186,9 @@ classdef DispersedNumericRaichle1983 < handle & mloxygen.Raichle1983
     end
 
 	methods 
-        
-        %% GET
-        
-        function g = get.artery_interpolated(this)
-            g = this.strategy_.artery_interpolated;
-        end
-        function g = get.times_sampled(this)
-            g = this.strategy_.times_sampled;
-        end
-        
-        %%
-		  
-        function [k,sk] = k4(this, varargin)
-            [k,sk] = k4(this.strategy_, varargin{:});
-        end
-        function [k,sk] = ks(this, varargin)
-            k = zeros(1,this.LENK);
-            sk = zeros(1,this.LENK);
-            [k(1),sk(1)] = k1(this.strategy_, varargin{:});
-            [k(2),sk(2)] = k2(this.strategy_, varargin{:});
-            [k(3),sk(3)] = k3(this.strategy_, varargin{:});
-            [k(4),sk(4)] = k4(this.strategy_, varargin{:});
+        function ks = buildKs(this, varargin)
+            this = solve(this, varargin{:});
+            ks = [k1(this) k2(this) k3(this) k4(this) k5(this)];
         end
         function ho  = checkSimulated(this, varargin)
             %% CHECKSIMULATED simulates tissue activity with passed and internal parameters without changing state.
@@ -227,12 +204,53 @@ classdef DispersedNumericRaichle1983 < handle & mloxygen.Raichle1983
             
             ho = this.model.simulated(ipr.ks, 'aif', ipr.aif, 'Dt', this.Dt);
         end
-        
+        function fs_ = fs(this, varargin)
+            %% fs == [f PS lambda Delta Dt]
+            %  @param 'typ' is char, understood by imagingType.
+            
+            ip = inputParser;
+            ip.KeepUnmatched = true;
+            addParameter(ip, 'typ', 'mlfourd.ImagingContext2', @ischar)
+            parse(ip, varargin{:})
+            ipr = ip.Results;
+            
+            k(1) = k1(this.strategy_, varargin{:});
+            k(2) = k2(this.strategy_, varargin{:});
+            k(3) = k3(this.strategy_, varargin{:});
+            k(4) = k4(this.strategy_, varargin{:});
+            k(5) = this.Dt;
+             
+            roibin = logical(this.roi);
+            fs_ = copy(this.roi.fourdfp);
+            fs_.img = zeros([size(this.roi) length(k)]);
+            for t = 1:length(k)
+                img = zeros(size(this.roi), 'single');
+                img(roibin) = k(t);
+                fs_.img(:,:,:,t) = img;
+            end
+            fs_.fileprefix = this.sessionData.fsOnAtlas('typ', 'fp', 'tags', [this.blurTag this.regionTag]);
+            fs_ = imagingType(ipr.typ, fs_);
+        end
+        function [k,sk] = k4(this, varargin)
+            [k,sk] = k4(this.strategy_, varargin{:});
+        end
+        function [k,sk] = k5(this, varargin)
+            k = this.Dt;
+            sk = nan;
+        end
+        function ks_ = ks(this, varargin)
+            ks_ = this.fs(varargin{:});
+        end
+    end
+    
+    %% PROTECTED
+    
+    methods (Access = protected)        
  		function this = DispersedNumericRaichle1983(varargin)
  			%% DISPERSEDNUMERICRAICHLE1983
             %  @param devkit is mlpet.IDeviceKit.
             %  @param ho is numeric.
-            %  @param solver is in {'nest' 'simulanneal' 'hmc' 'lm' 'bfgs'}.
+            %  @param solver is in {'simulanneal'}.
             %  @param blurHo := {[], 0, 4.3, ...}            
             %  @param sigma0, default from mloptimization.SimulatedAnnealing.
 
@@ -251,14 +269,9 @@ classdef DispersedNumericRaichle1983 < handle & mloxygen.Raichle1983
                     this.strategy_ = mloxygen.DispersedRaichle1983SimulAnneal( ...
                         'context', this, varargin{:});
                 otherwise
-                    error('mloxygen:NotImplementedError', 'Raichle1983.ipr.solver->%s', ipr.solver)
+                    error('mloxygen:NotImplementedError', 'DispersedNumericRaichle1983.ipr.solver->%s', ipr.solver)
             end
         end
-    end
-    
-    %% PROTECTED
-    
-    methods (Access = protected)
         function that = copyElement(this)
             %%  See also web(fullfile(docroot, 'matlab/ref/matlab.mixin.copyable-class.html'))
             

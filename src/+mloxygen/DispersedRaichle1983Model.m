@@ -10,7 +10,50 @@ classdef DispersedRaichle1983Model < mloxygen.Raichle1983Model
  	%% It was developed on Matlab 9.7.0.1434023 (R2019b) Update 6 for MACI64.  Copyright 2020 John Joowon Lee.
  	
     methods (Static)
-        function qs       = solution(ks, artery_interpolated)
+        function loss = loss_function(ks, artery_interpolated, times_sampled, measurement, sigma0)
+            import mloxygen.DispersedRaichle1983Model.sampled  
+            estimation  = sampled(ks, artery_interpolated, times_sampled);
+            measurement = measurement(1:length(estimation));
+            taus        = diff(times_sampled);
+            taus        = [taus taus(end)];
+            taus        = taus(1:length(estimation));
+            positive    = measurement > 0;
+            e           = estimation .* taus;
+            m           = measurement .* taus;
+            eoverm      = e(positive)./m(positive);
+            Q           = sum((1 - eoverm).^2);
+            loss        = 0.5*Q/sigma0^2; % + sum(log(sigma0*measurement)); % sigma ~ sigma0*measurement
+        end  
+        function m    = preferredMap()
+            %% init from Raichle J Nucl Med 24:790-798, 1983; Herscovitch JCBFM 5:65-69 1985; Herscovitch JCBFM 7:527s-542 1987
+            %  PS in [0.0140 0.0245 0.0588] Hz for white, brain, grey;
+            %  PS min := PS(1) - (PS(2) - PS(1))
+            %  PS max := PS(3) + (PS(3) - PS(2))
+            %  PS init := PS(2)
+            %  PS sigma := 0.08*(PS init)
+            %  lambda described in Table 2
+            
+            m = containers.Map;
+            m('k1') = struct('min', 0.0043, 'max', 0.0155, 'init', 0.00777, 'sigma', 3.89e-4); % f / s
+            m('k2') = struct('min', 0.0137, 'max', 0.0266, 'init', 0.0228,  'sigma', 0.002); % PS / s
+            m('k3') = struct('min', 0.608,  'max', 1.06,   'init', 0.945,   'sigma', 0.05); % lambda in mL/mL
+            m('k4') = struct('min', 0.08,   'max', 2,      'init', 1,       'sigma', 0.1); % Delta for cerebral dispersion
+        end
+        function qs   = sampled(ks, artery_interpolated, times_sampled)
+            %  @param artery_interpolated is uniformly sampled at high sampling freq.
+            %  @param times_sampled are samples scheduled by the time-resolved PET reconstruction
+            
+            import mloxygen.DispersedRaichle1983Model.solution
+            qs = solution(ks, artery_interpolated);
+            n = length(artery_interpolated);
+            qs = makima(0:n-1, qs, times_sampled);
+        end
+        function loss = simulanneal_objective(ks, artery_interpolated, times_sampled, qs0, sigma0)
+            import mloxygen.DispersedRaichle1983Model.sampled          
+            qs = sampled(ks, artery_interpolated, times_sampled);            
+            loss = 0.5 * sum((1 - qs ./ qs0).^2) / sigma0^2; % + sum(log(sigma0*qs0)); % sigma ~ sigma0 * qs0
+        end  
+        function qs   = solution(ks, artery_interpolated)
             %  @param artery_interpolated is uniformly with at high sampling freq. starting at time = 0.
 
             import mlpet.AerobicGlycolysisKit
@@ -38,53 +81,11 @@ classdef DispersedRaichle1983Model < mloxygen.Raichle1983Model
             qs = E*f*conv(exp(-E*f*times/lambda - ALPHA*times), artery_interpolated1);
             qs = qs(1:n);
         end        
-        function qs       = sampled(ks, artery_interpolated, times_sampled)
-            %  @param artery_interpolated is uniformly sampled at high sampling freq.
-            %  @param times_sampled are samples scheduled by the time-resolved PET reconstruction
-            
-            import mloxygen.DispersedRaichle1983Model.solution
-            qs = solution(ks, artery_interpolated);
-            n = length(artery_interpolated);
-            qs = makima(0:n-1, qs, times_sampled);
-        end
-        function loss = simulanneal_objective(ks, artery_interpolated, times_sampled, qs0, sigma0)
-            import mloxygen.DispersedRaichle1983Model.sampled          
-            qs = sampled(ks, artery_interpolated, times_sampled);            
-            loss = 0.5 * sum((1 - qs ./ qs0).^2) / sigma0^2; % + sum(log(sigma0*qs0)); % sigma ~ sigma0 * qs0
-        end  
-        function loss = loss_function(ks, artery_interpolated, times_sampled, measurement, sigma0)
-            import mloxygen.DispersedRaichle1983Model.sampled  
-            estimation  = sampled(ks, artery_interpolated, times_sampled);
-            measurement = measurement(1:length(estimation));
-            taus        = diff(times_sampled);
-            taus        = [taus taus(end)];
-            taus        = taus(1:length(estimation));
-            positive    = measurement > 0;
-            e           = estimation .* taus;
-            m           = measurement .* taus;
-            eoverm      = e(positive)./m(positive);
-            Q           = sum((1 - eoverm).^2);
-            loss        = 0.5*Q/sigma0^2; % + sum(log(sigma0*measurement)); % sigma ~ sigma0*measurement
-        end  
-        function m = preferredMap()
-            %% init from Raichle J Nucl Med 24:790-798, 1983; Herscovitch JCBFM 5:65-69 1985; Herscovitch JCBFM 7:527s-542 1987
-            %  PS in [0.0140 0.0245 0.0588] Hz for white, brain, grey;
-            %  PS min := PS(1) - (PS(2) - PS(1))
-            %  PS max := PS(3) + (PS(3) - PS(2))
-            %  PS init := PS(2)
-            %  PS sigma := 0.08*(PS init)
-            %  lambda described in Table 2
-            
-            m = containers.Map;
-            m('k1') = struct('min', 0.0043, 'max', 0.0155, 'init', 0.00777, 'sigma', 3.89e-4); % f / s
-            m('k2') = struct('min', 0.0137, 'max', 0.0266, 'init', 0.0228,  'sigma', 0.002); % PS / s
-            m('k3') = struct('min', 0.608,  'max', 1.06,   'init', 0.945,   'sigma', 0.05); % lambda in mL/mL
-            m('k4') = struct('min', 0.08,   'max', 2,      'init', 1,       'sigma', 0.1); % Delta for cerebral dispersion
-        end
     end
 
 	methods		  
- 		function this = DispersedRaichle1983Model(varargin) 	
+ 		function this = DispersedRaichle1983Model(varargin) 
+            %  @param histology is:  'g', 'w', 's', else histology information is not used.	
             
             this = this@mloxygen.Raichle1983Model(varargin{:});
             
