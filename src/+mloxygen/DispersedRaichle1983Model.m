@@ -37,7 +37,7 @@ classdef DispersedRaichle1983Model < mloxygen.Raichle1983Model
             m('k1') = struct('min', 0.0043, 'max', 0.0155, 'init', 0.00777, 'sigma', 3.89e-4); % f / s
             m('k2') = struct('min', 0.0137, 'max', 0.0266, 'init', 0.0228,  'sigma', 0.002); % PS / s
             m('k3') = struct('min', 0.608,  'max', 1.06,   'init', 0.945,   'sigma', 0.05); % lambda in mL/mL
-            m('k4') = struct('min', 0.08,   'max', 2,      'init', 1,       'sigma', 0.1); % Delta for cerebral dispersion
+            m('k4') = struct('min', 0.2,    'max', 10,     'init', 1,       'sigma', 0.1); % Delta for cerebral dispersion
         end
         function qs   = sampled(ks, artery_interpolated, times_sampled)
             %  @param artery_interpolated is uniformly sampled at high sampling freq.
