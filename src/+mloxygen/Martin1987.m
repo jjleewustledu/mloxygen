@@ -122,10 +122,17 @@ classdef Martin1987 < handle & mlpet.TracerKinetics
             ipr.roi = mlfourd.ImagingContext2(ipr.roi);
             
             a = this.arterial_;
-            s = this.scanner_;            
+            s = this.scanner_;
+            tac = s.imagingContext;
+            if rank(tac) == 4
+                tac = tac.volumeAveraged(ipr.roi);
+            end
+            if rank(tac) == 3
+                error('mloxygen:ValueError', 'Martin1987.plot:  rank(tac) == 3 is not supported')
+            end
             h = figure; 
             plot(a.datetimes, a.activityDensity(), ':o', ...
-                 s.datetimes, ipr.zoom*s.activityDensity(), ':o')
+                 s.datetimes, ipr.zoom*tac.fourdfp.img, ':o')
             ylabel('activity / (Bq/mL)')
             legend('aif', [num2str(ipr.zoom) 'x oc'])            
             dbs = dbstack;
