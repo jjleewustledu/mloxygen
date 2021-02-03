@@ -74,6 +74,7 @@ classdef DispersedNumericRaichle1983 < handle & mloxygen.Raichle1983
         end
         function Dt = DTimeToShift(varargin)
             %% Dt by which to shift arterial to match diff(scanner):  Dt < 0 will shift left; Dt > 0 will shift right.
+            %  Adjusts for ipr.counter.datetime0 ~= ipr.scanner.datetime0.
             
             ip = inputParser;
             addRequired(ip, 't_a')
@@ -133,7 +134,6 @@ classdef DispersedNumericRaichle1983 < handle & mloxygen.Raichle1983
             DTimeToShift = @mloxygen.DispersedNumericRaichle1983.DTimeToShift;
             extrapolateEarlyLateAif = @mloxygen.DispersedNumericRaichle1983.extrapolateEarlyLateAif;
             reshapeScanner = @mloxygen.DispersedNumericRaichle1983.reshapeScanner;
-            shiftWorldlines = @mloxygen.DispersedNumericRaichle1983.shiftWorldlines;
                         
             [hoTimesMid,ho,hoTimeMin] = reshapeScanner(scanner); % hoTimesMid(1) ~ 0; hoTimeMin ~ -5
             aifTimes = hoTimesMid(1):hoTimesMid(end); % aifTimes ~ [0 ... 574]
@@ -148,7 +148,6 @@ classdef DispersedNumericRaichle1983 < handle & mloxygen.Raichle1983
             aif = makima([aifTimes__ aifTimes(end)], [aif__ 0], aifTimes); % satisfies 2.             
             
             Dt = DTimeToShift(aifTimes, aif, hoTimesMid, ho);
-            aif = shiftWorldlines(aif, Dt);
         end
         function [timesMid,ho,timeMin] = reshapeScanner(scanner)
             %% prepends frames to scanner.activityDensity, then resamples

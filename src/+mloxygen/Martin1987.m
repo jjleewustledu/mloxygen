@@ -15,7 +15,7 @@ classdef Martin1987 < handle & mlpet.TracerKinetics
     end
     
     methods (Static)
-        function [this,oo,aif] = createFromDeviceKit(devkit, varargin)            
+        function [this,oo,aif] = createFromDeviceKit(devkit, varargin)
             ip = inputParser;
             ip.KeepUnmatched = true;
             addRequired(ip, 'devkit', @(x) isa(x, 'mlpet.IDeviceKit'))
@@ -139,7 +139,7 @@ classdef Martin1987 < handle & mlpet.TracerKinetics
             title(sprintf('%s: indices->%s\n%s', dbs(1).name, mat2str(ipr.index), ipr.roi.fileprefix))
         end
         function this = solve(this, varargin)
-            %  @param tags is char, e.g., '_wmparc1', '_wholebrain'
+            %  @param tags is char, e.g., 'wmparc1', 'wholebrain', 'voxel'
             
             ip = inputParser;
             addParameter(ip, 'tags', ['_' this.sessionData.region], @ischar)
@@ -161,7 +161,7 @@ classdef Martin1987 < handle & mlpet.TracerKinetics
             parse(ip, varargin{:})
             obj = imagingType(ip.Results.typ, this.product_);
         end
-        function obj = v1(this, varargin)            
+        function obj = v1(this, varargin)
             ip = inputParser;
             addParameter(ip, 'typ', 'mlfourd.ImagingContext2', @ischar)
             parse(ip, varargin{:})
