@@ -71,11 +71,6 @@ classdef Raichle1983 < handle & mlpet.TracerKineticsStrategy
  		function this = Raichle1983(varargin)
             this = this@mlpet.TracerKineticsStrategy(varargin{:});
         end
-        function that = copyElement(this)
-            %%  See also web(fullfile(docroot, 'matlab/ref/matlab.mixin.copyable-class.html'))
-            
-            that = copyElement@matlab.mixin.Copyable(this);
-        end
  	end 
 
 	%  Created with Newcl by John J. Lee after newfcn by Frank Gonzalez-Morphy

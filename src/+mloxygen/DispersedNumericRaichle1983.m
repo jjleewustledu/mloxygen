@@ -71,43 +71,7 @@ classdef DispersedNumericRaichle1983 < handle & mloxygen.Raichle1983
                 'artery_interpolated', aif, ...
                 'roi', ipr.roi, ...
                 varargin{:});
-        end
-        function Dt = DTimeToShift(varargin)
-            %% Dt by which to shift arterial to match diff(scanner):  Dt < 0 will shift left; Dt > 0 will shift right.
-            %  Adjusts for ipr.counter.datetime0 ~= ipr.scanner.datetime0.
-            
-            ip = inputParser;
-            addRequired(ip, 't_a')
-            addRequired(ip, 'activity_a')
-            addRequired(ip, 't_s')
-            addRequired(ip, 'activity_s')
-            parse(ip, varargin{:})
-            ipr = ip.Results;
-                        
-            t_a        = ipr.t_a;
-            activity_a = ipr.activity_a;
-            t_s        = ipr.t_s;
-            activity_s = ipr.activity_s;
-            
-            unif_t = min([t_a t_s]):max([t_a t_s]);
-            unif_activity_s = makima(t_s, activity_s, unif_t);
-            d_activity_s = diff(unif_activity_s); % uniformly sampled time-derivative
-            
-            % shift dcv in time to match inflow with dtac
-            [~,idx_a] = max(activity_a > 0.1*max(activity_a)); % idx_a ~ 35
-            [~,idx_s] = max(d_activity_s > 0.1*max(d_activity_s)); % idx_s ~ 35
-            Dt = unif_t(idx_s) - t_a(idx_a); % Dt ~ 5
-            if Dt < -abs(t_a(idx_a))
-                warning('mloxygen:ValueError', ...
-                    'DispersedNumericRaichle1983.DTimeToShift.Dt -> %g; forcing -> %g', Dt, -t_a(idx_a))
-                Dt = -abs(t_a(idx_a));
-            end
-            if Dt > t_a(end)
-                warning('mloxygen:ValueError', ...
-                    'DispersedNumericRaichle1983.DTimeToShift.Dt -> %g; forcing -> 0', Dt)
-                Dt = 0;
-            end
-        end        
+        end       
         function aif = extrapolateEarlyLateAif(aif__)
             [~,idx0] = max(aif__ > 0.1*max(aif__));
             idx0 = idx0 - 2;
@@ -131,11 +95,11 @@ classdef DispersedNumericRaichle1983 < handle & mloxygen.Raichle1983
             %  2.  sample aif on uniform time coordinates
             %  3.  infer & apply shift of worldline, Dt, for aif
             
-            DTimeToShift = @mloxygen.DispersedNumericRaichle1983.DTimeToShift;
             extrapolateEarlyLateAif = @mloxygen.DispersedNumericRaichle1983.extrapolateEarlyLateAif;
             reshapeScanner = @mloxygen.DispersedNumericRaichle1983.reshapeScanner;
-                        
-            [hoTimesMid,ho,hoTimeMin] = reshapeScanner(scanner); % hoTimesMid(1) ~ 0; hoTimeMin ~ -5
+             
+            [hoTimesMid,~,hoTimeMin] = reshapeScanner(scanner); % hoTimesMid(1) ~ 0; hoTimeMin ~ -5
+            %[hoTimesMid,ho,hoTimeMin] = reshapeScanner(scanner); % hoTimesMid(1) ~ 0; hoTimeMin ~ -5
             aifTimes = hoTimesMid(1):hoTimesMid(end); % aifTimes ~ [0 ... 574]
             hoDatetime0 = scanner.datetime0 + seconds(hoTimeMin); % hoDatetime0 ~ 23-May-2019 12:04:20
             aifDatetime0 = arterial.datetime0; % aifDatetime0 ~ 23-May-2019 12:03:59
@@ -147,7 +111,7 @@ classdef DispersedNumericRaichle1983 < handle & mloxygen.Raichle1983
             aif__ = extrapolateEarlyLateAif(aif__);
             aif = makima([aifTimes__ aifTimes(end)], [aif__ 0], aifTimes); % satisfies 2.             
             
-            Dt = DTimeToShift(aifTimes, aif, hoTimesMid, ho);
+            Dt = arterial.Dt;
         end
         function [timesMid,ho,timeMin] = reshapeScanner(scanner)
             %% prepends frames to scanner.activityDensity, then resamples

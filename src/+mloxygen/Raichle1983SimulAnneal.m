@@ -19,6 +19,17 @@ classdef Raichle1983SimulAnneal < mlpet.TracerSimulAnneal & mloxygen.Raichle1983
             this.artery_interpolated = this.model.artery_interpolated;
         end        
         
+        function fprintfModel(this)
+            fprintf('Simulated Annealing:\n');            
+            for ky = 1:length(this.ks)
+                fprintf('\tk%i = %f\n', ky, this.ks(ky));
+            end           
+            fprintf('\tE = 1 - exp(-PS/f) = %f\n', 1 - exp(-this.ks(2)/this.ks(1)))
+            fprintf('\tsigma0 = %f\n', this.sigma0);
+            for ky = this.map.keys
+                fprintf('\tmap(''%s'') => %s\n', ky{1}, struct2str(this.map(ky{1})));
+            end
+        end
         function [k,sk] = k1(this, varargin)
             [k,sk] = find_result(this, 'k1');
         end
@@ -76,6 +87,17 @@ classdef Raichle1983SimulAnneal < mlpet.TracerSimulAnneal & mloxygen.Raichle1983
                 plot(this)
             end
         end 
+        function s = sprintfModel(this)
+            s = sprintf('Simulated Annealing:\n');
+            for ky = 1:length(this.ks)
+                s = [s sprintf('\tk%i = %f\n', ky, this.ks(ky))]; %#ok<AGROW>
+            end
+            s = [s sprintf('\tE = 1 - exp(-PS/f) = %f\n', 1 - exp(-this.ks(2)/this.ks(1)))];
+            s = [s sprintf('\tsigma0 = %f\n', this.sigma0)];
+            for ky = this.map.keys
+                s = [s sprintf('\tmap(''%s'') => %s\n', ky{1}, struct2str(this.map(ky{1})))]; %#ok<AGROW>
+            end
+        end
  	end 
 
 	%  Created with Newcl by John J. Lee after newfcn by Frank Gonzalez-Morphy
