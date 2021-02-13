@@ -29,6 +29,7 @@ classdef Raichle1983SimulAnneal < mlpet.TracerSimulAnneal & mloxygen.Raichle1983
             for ky = this.map.keys
                 fprintf('\tmap(''%s'') => %s\n', ky{1}, struct2str(this.map(ky{1})));
             end
+            fprintf('\tzoom => %g\n', this.zoom);
         end
         function [k,sk] = k1(this, varargin)
             [k,sk] = find_result(this, 'k1');
@@ -97,6 +98,7 @@ classdef Raichle1983SimulAnneal < mlpet.TracerSimulAnneal & mloxygen.Raichle1983
             for ky = this.map.keys
                 s = [s sprintf('\tmap(''%s'') => %s\n', ky{1}, struct2str(this.map(ky{1})))]; %#ok<AGROW>
             end
+            s = [s sprintf('\tzoom => %g\n', this.zoom)];
         end
  	end 
 
