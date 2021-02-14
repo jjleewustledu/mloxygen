@@ -10,7 +10,7 @@ classdef DispersedRaichle1983Model < mloxygen.Raichle1983Model
  	%% It was developed on Matlab 9.7.0.1434023 (R2019b) Update 6 for MACI64.  Copyright 2020 John Joowon Lee.
  	
     methods (Static)
-        function loss = loss_function(ks, artery_interpolated, times_sampled, measurement, sigma0)
+        function loss = loss_function(ks, artery_interpolated, times_sampled, measurement, ~)
             import mloxygen.DispersedRaichle1983Model.sampled  
             T = mloxygen.DispersedRaichle1983Model.T;
             estimation  = sampled(ks, artery_interpolated, times_sampled);
