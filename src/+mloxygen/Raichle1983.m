@@ -16,31 +16,10 @@ classdef Raichle1983 < handle & mlpet.TracerKineticsStrategy
         end
     end
     
-    methods        
+    methods   
         function fs_ = fs(this, varargin)
-            %% fs == [f PS lambda]
-            
-            ip = inputParser;
-            ip.KeepUnmatched = true;
-            addOptional(ip, 'typ', 'mlfourd.ImagingContext2', @ischar)
-            parse(ip, varargin{:})
-            ipr = ip.Results;
-            
-            k(1) = k1(this.strategy_, varargin{:});
-            k(2) = k2(this.strategy_, varargin{:});
-            k(3) = k3(this.strategy_, varargin{:});
-             
-            roibin = logical(this.roi);
-            fs_ = copy(this.roi.fourdfp);
-            fs_.img = zeros([size(this.roi) length(k)]);
-            for t = 1:length(k)
-                img = zeros(size(this.roi), 'single');
-                img(roibin) = k(t);
-                fs_.img(:,:,:,t) = img;
-            end
-            fs_.fileprefix = this.sessionData.fsOnAtlas('typ', 'fp', 'tags', [this.blurTag this.regionTag]);
-            fs_ = imagingType(ipr.typ, fs_);
-        end        
+            fs_ = this.ks(varargin{:});
+        end            
         function ks = buildKs(this, varargin)
             this = solve(this, varargin{:});
             ks = [k1(this) k2(this) k3(this)];
@@ -61,8 +40,29 @@ classdef Raichle1983 < handle & mlpet.TracerKineticsStrategy
             [k,sk] = k3(this.strategy_, varargin{:});
         end
         function ks_ = ks(this, varargin)
-            ks_ = this.fs(varargin{:});
-        end
+            %% ks == [f PS lambda]
+            
+            ip = inputParser;
+            ip.KeepUnmatched = true;
+            addOptional(ip, 'typ', 'mlfourd.ImagingContext2', @ischar)
+            parse(ip, varargin{:})
+            ipr = ip.Results;
+            
+            k(1) = k1(this.strategy_, varargin{:});
+            k(2) = k2(this.strategy_, varargin{:});
+            k(3) = k3(this.strategy_, varargin{:});
+             
+            roibin = logical(this.roi);
+            ks_ = copy(this.roi.fourdfp);
+            ks_.img = zeros([size(this.roi) length(k)]);
+            for t = 1:length(k)
+                img = zeros(size(this.roi), 'single');
+                img(roibin) = k(t);
+                ks_.img(:,:,:,t) = img;
+            end
+            ks_.fileprefix = this.sessionData.fsOnAtlas('typ', 'fp', 'tags', [this.blurTag this.regionTag]);
+            ks_ = imagingType(ipr.typ, ks_);
+        end 
     end
     
     %% PROTECTED
