@@ -83,9 +83,9 @@ classdef DispersedMintun1984Model < mloxygen.Mintun1984Model
             %  @param times_sampled are samples scheduled by the time-resolved PET reconstruction
             
             import mloxygen.DispersedMintun1984Model.solution
+            import mlpet.TracerKineticsModel.solutionOnScannerFrames 
             qs = solution(ks, fs, artery_interpolated);
-            n = length(artery_interpolated);
-            qs = makima(0:n-1, qs, times_sampled);
+            qs = solutionOnScannerFrames(qs, times_sampled);
         end
         function loss = simulanneal_objective(ks, fs, artery_interpolated, times_sampled, qs0, sigma0)
             import mloxygen.DispersedMintun1984Model.sampled          
@@ -98,6 +98,8 @@ classdef DispersedMintun1984Model < mloxygen.Mintun1984Model
             import mlpet.AerobicGlycolysisKit
             
             ALPHA = 0.005670305; % log(2)/halflife in 1/s
+            T = mloxygen.DispersedMintun1984Model.T;
+            U = T + 91; % cf. Mintun1984
             
             metabf = ks(1);
             oef = ks(2);
@@ -105,12 +107,12 @@ classdef DispersedMintun1984Model < mloxygen.Mintun1984Model
             PS = fs(2);
             lambda = fs(3); 
             Delta = fs(4);
-            Dt = round(fs(5));
+%             Dt = round(fs(5));
             v1 = fs(6);
-            m = max(1 - exp(-PS/f), AerobicGlycolysisKit.E_MIN);
-            m = min(m, AerobicGlycolysisKit.E_MAX);
+            m = 1 - exp(-PS/f);
             n = length(artery_interpolated);
             times = 0:1:n-1;
+            times = times - T;
              
             % use Delta, metabf
             auc0 = trapz(artery_interpolated);
@@ -119,16 +121,16 @@ classdef DispersedMintun1984Model < mloxygen.Mintun1984Model
             artery_interpolated1 = artery_interpolated1*auc0/trapz(artery_interpolated1);
             
             shape = ones(size(artery_interpolated1));
-            if Dt < 0
-                shape(1:91) = linspace(0, metabf, 91);
-                shape(92:end) = linspace(metabf, 1, length(shape)-91);
-                artery_h2o_dc = metabf*artery_interpolated1(91)*2^(90/122.2416)*shape;
-            else
-                shape(1:1+Dt) = 0;
-                shape(1+Dt:91+Dt) = linspace(0, metabf, 91);
-                shape(92+Dt:end) = linspace(metabf, 1, length(shape)-91-Dt);
-                artery_h2o_dc = metabf*artery_interpolated1(91+Dt)*2^((90+Dt)/122.2416)*shape;
-            end
+%             if Dt < 0
+                shape(1:U) = linspace(0, metabf, U);
+                shape(U+1:end) = linspace(metabf, 1, length(shape)-U);
+                artery_h2o_dc = metabf*artery_interpolated1(U)*2^((U-1)/122.2416)*shape;
+%             else
+%                 shape(1:1+Dt) = 0;
+%                 shape(1+Dt:U+Dt) = linspace(0, metabf, U);
+%                 shape(U+1+Dt:end) = linspace(metabf, 1, length(shape)-U-Dt);
+%                 artery_h2o_dc = metabf*artery_interpolated1(U+Dt)*2^((U-1+Dt)/122.2416)*shape;
+%             end
             artery_h2o = artery_h2o_dc .* 2.^(-times/122.2416);
             artery_o2 = artery_interpolated1 - artery_h2o;
             artery_o2(artery_o2 < 0) = 0;
@@ -145,14 +147,14 @@ classdef DispersedMintun1984Model < mloxygen.Mintun1984Model
             
             % use E, f, lambda
             rho = rho1(1:n) + rho2(1:n);
+            rho = rho(T+1:n);
         end        
     end
 
 	methods		  
  		function this = DispersedMintun1984Model(varargin)
  			this = this@mloxygen.Mintun1984Model(varargin{:});
-        end
-        
+        end        
         function ho   = simulated(this, varargin)
             %% SIMULATED simulates tissue activity with passed and internal parameters.
             %  @param required ks is variational [metabf oef].
