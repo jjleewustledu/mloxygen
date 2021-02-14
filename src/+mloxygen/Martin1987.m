@@ -204,7 +204,8 @@ classdef Martin1987 < handle & mlpet.TracerKinetics
             this.Tf_        = ipr.Tf;
             
             this.scanner_  = this.devkit_.buildScannerDevice();
-            this.arterial_ = this.devkit_.buildArterialSamplingDevice(this.scanner_);
+            this.arterial_ = this.devkit_.buildArterialSamplingDevice( ...
+                this.scanner_, 'preciseAlignment', false);
             this.counting_ = this.devkit_.buildCountingDevice();
         end
         function boundTfByAif(this, aif)
