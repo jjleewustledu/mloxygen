@@ -60,19 +60,15 @@ classdef DispersedMintun1984Model < mloxygen.Mintun1984Model
             v1_avgxyz = cbv.volumeAveraged(roi) * 0.0105;
             vecT = [fs_avgxyz.fourdfp.img v1_avgxyz.fourdfp.img];
         end
-        function loss = loss_function(ks, fs, artery_interpolated, times_sampled, measurement, sigma0)
+        function loss = loss_function(ks, fs, artery_interpolated, times_sampled, measurement, ~)
             import mloxygen.DispersedMintun1984Model.sampled  
             estimation  = sampled(ks, fs, artery_interpolated, times_sampled);
             measurement = measurement(1:length(estimation));
-            taus        = diff(times_sampled);
-            taus        = [taus taus(end)];
-            taus        = taus(1:length(estimation));
-            positive    = measurement > 0;
-            e           = estimation .* taus;
-            m           = measurement .* taus;
-            eoverm      = e(positive)./m(positive);
-            Q           = sum((1 - eoverm).^2);
-            loss        = 0.5*Q/sigma0^2; % + sum(log(sigma0*measurement)); % sigma ~ sigma0*measurement
+            positive    = measurement > 0.05*max(measurement);
+            eoverm      = estimation(positive)./measurement(positive);
+            Q           = mean(abs(1 - eoverm));
+            %Q           = sum((1 - eoverm).^2);
+            loss        = 0.5*Q; %/sigma0^2; % + sum(log(sigma0*measurement)); % sigma ~ sigma0*measurement
         end  
         function m    = preferredMap()
             %% init from Mintun J Nucl Med 25:177-187, 198.

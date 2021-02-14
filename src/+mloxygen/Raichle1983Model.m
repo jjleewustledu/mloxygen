@@ -29,19 +29,15 @@ classdef (Abstract) Raichle1983Model < mlpet.TracerKineticsModel
             
             logp = sum(-log(Sigma) - 0.5*log(2*pi) - 0.5*Z.^2); % scalar
         end
-        function loss = loss_function(ks, artery_interpolated, times_sampled, measurement, sigma0)
+        function loss = loss_function(ks, artery_interpolated, times_sampled, measurement, ~)
             import mloxygen.Raichle1983Model.sampled  
             estimation  = sampled(ks, artery_interpolated, times_sampled);
             measurement = measurement(1:length(estimation));
-            taus        = diff(times_sampled);
-            taus        = [taus taus(end)];
-            taus        = taus(1:length(estimation));
-            positive    = measurement > 0;
-            e           = estimation .* taus;
-            m           = measurement .* taus;
-            eoverm      = e(positive)./m(positive);
-            Q           = sum((1 - eoverm).^2);
-            loss        = 0.5*Q/sigma0^2; % + sum(log(sigma0*measurement)); % sigma ~ sigma0*measurement
+            positive    = measurement > 0.05*max(measurement);
+            eoverm      = estimation(positive)./measurement(positive);
+            Q           = mean(abs(1 - eoverm));
+            %Q           = sum((1 - eoverm).^2);
+            loss        = 0.5*Q; %/sigma0^2; % + sum(log(sigma0*measurement)); % sigma ~ sigma0*measurement
         end  
         function m    = preferredMap()
             %% init from Raichle J Nucl Med 24:790-798, 1983; Herscovitch JCBFM 5:65-69 1985; Herscovitch JCBFM 7:527s-542 1987
@@ -53,10 +49,10 @@ classdef (Abstract) Raichle1983Model < mlpet.TracerKineticsModel
             %  lambda described in Table 2
             
             m = containers.Map;
-            m('k1') = struct('min', 0.0043, 'max', 0.0155, 'init', 0.00777, 'sigma', 3.89e-4); % f / s, max ~ 0.0155
-            m('k2') = struct('min', 0.0137, 'max', 0.0266, 'init', 0.0228,  'sigma', 0.002); % PS / s
-            m('k3') = struct('min', 0.608,  'max', 1.06,   'init', 0.945,   'sigma', 0.05); % lambda in mL/mL
-            m('k4') = struct('min', 0.01,   'max', 2,      'init', 1,       'sigma', 0.1); % Delta for cerebral dispersion
+            m('k1') = struct('min', 0.0043, 'max',  0.0155, 'init', 0.00777, 'sigma', 3.89e-4); % f / s, max ~ 0.0155
+            m('k2') = struct('min', 0.0137, 'max',  0.0266, 'init', 0.0228,  'sigma', 0.002); % PS / s
+            m('k3') = struct('min', 0.608,  'max',  1.06,   'init', 0.945,   'sigma', 0.05); % lambda in mL/mL
+            m('k4') = struct('min', 0.01,   'max',  1,      'init', 1,       'sigma', 0.1); % Delta for cerebral dispersion
         end
         function qs   = sampled(ks, artery_interpolated, times_sampled)
             %  @param artery_interpolated is uniformly sampled at high sampling freq.
