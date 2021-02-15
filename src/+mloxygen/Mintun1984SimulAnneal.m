@@ -28,21 +28,29 @@ classdef Mintun1984SimulAnneal < mlpet.TracerSimulAnneal & mloxygen.Mintun1984St
         function h = plot(this, varargin)
             ip = inputParser;
             addParameter(ip, 'showAif', true, @islogical)
-            addParameter(ip, 'xlim', [-5 500], @isnumeric)            
+            addParameter(ip, 'xlim', [-10 500], @isnumeric)            
             addParameter(ip, 'ylim', [], @isnumeric)
-            addParameter(ip, 'zoom', 1, @isnumeric)
+            addParameter(ip, 'zoom', 2, @isnumeric)
             parse(ip, varargin{:})
             ipr = ip.Results;
+            this.zoom = ipr.zoom;            
             
-            aif = this.artery_interpolated;
+            RR = mlraichle.RaichleRegistry.instance();
+            tBuffer = RR.tBuffer;
+            aif = this.dispersedAif(this.artery_interpolated);
             h = figure;
             times = this.times_sampled;
             sampled = this.model.sampled(this.ks, this.model.fs_Raichle_Martin, aif, times);
             if ipr.showAif
                 plot(times, ipr.zoom*this.Measurement, ':o', ...
                     times(1:length(sampled)), ipr.zoom*sampled, '-', ...
-                    0:length(aif)-1, aif, '--')                
-                legend('measurement', 'estimation', 'aif')
+                    -tBuffer:length(aif)-tBuffer-1, aif, '--') 
+                if ipr.zoom > 1
+                    leg_aif = sprintf('aif x%i', ipr.zoom);
+                else
+                    leg_aif = 'aif';
+                end
+                legend('measurement', 'estimation', leg_aif)
             else
                 plot(times, ipr.zoom*this.Measurement, 'o', ...
                     times(1:length(sampled)), ipr.zoom*sampled, '-')                

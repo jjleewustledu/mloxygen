@@ -68,7 +68,6 @@ classdef DispersedMartin1987Solver
             end 
             fprintf('\tT0 => %g\n', this.model.T0); 
             fprintf('\tTf => %g\n', this.model.Tf); 
-            fprintf('\tzoom => %g\n', this.zoom); 
         end
         function [k,sk] = k1(this, varargin)
             [k,sk] = find_result(this, 'k1');
@@ -76,22 +75,28 @@ classdef DispersedMartin1987Solver
         function h = plot(this, varargin)
             ip = inputParser;
             addParameter(ip, 'showAif', true, @islogical)
-            addParameter(ip, 'xlim', [-5 500], @isnumeric)            
+            addParameter(ip, 'xlim', [-10 500], @isnumeric)            
             addParameter(ip, 'ylim', [], @isnumeric)
             addParameter(ip, 'zoom', 10, @isnumeric)
             parse(ip, varargin{:})
             ipr = ip.Results;
             this.zoom = ipr.zoom;
             
-            T = mlpet.TracerKineticsModel.T;
+            RR = mlraichle.RaichleRegistry.instance();
+            tBuffer = RR.tBuffer;
             aif = this.artery_interpolated;
             h = figure;
             times = this.times_sampled;
             
             if ipr.showAif
                 plot(times, ipr.zoom*this.Measurement, ':o', ...
-                    0:length(aif)-T-1, aif(T+1:end), '--')                
-                legend('measurement', 'aif')
+                    0:length(aif)-tBuffer-1, aif(tBuffer+1:end), '--') 
+                if ipr.zoom > 1
+                    leg_aif = sprintf('aif x%i', ipr.zoom);
+                else
+                    leg_aif = 'aif';
+                end
+                legend('measurement', leg_aif)
             else
                 plot(times, ipr.zoom*this.Measurement, 'o')                
                 legend('measurement')
@@ -100,7 +105,7 @@ classdef DispersedMartin1987Solver
             if ~isempty(ipr.ylim); ylim(ipr.ylim); end
             xlabel('times / s')
             ylabel('activity / (Bq/mL)')
-            annotation('textbox', [.175 .25 .3 .3], 'String', sprintfModel(this), 'FitBoxToText', 'on', 'FontSize', 7, 'LineStyle', 'none')
+            annotation('textbox', [.5 .3 .3 .3], 'String', sprintfModel(this), 'FitBoxToText', 'on', 'FontSize', 7, 'LineStyle', 'none')
             dbs = dbstack;
             title(dbs(1).name)
         end
@@ -143,7 +148,6 @@ classdef DispersedMartin1987Solver
             end
             s = [s sprintf('\tT0 => %g\n', this.model.T0)]; 
             s = [s sprintf('\tTf => %g\n', this.model.Tf)]; 
-            s = [s sprintf('\tzoom => %g\n', this.zoom)];
         end 
  	end 
     
