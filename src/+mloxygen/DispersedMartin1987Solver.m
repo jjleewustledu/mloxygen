@@ -19,6 +19,8 @@ classdef DispersedMartin1987Solver
         sigma0 = 0.05        % fraction of Measurement < 1
         times_sampled        % numeric times for Measurement; midpoints of frames for PET 
         zoom = 1
+        
+        Dt
  	end
     
 	properties (Dependent)   
@@ -48,6 +50,7 @@ classdef DispersedMartin1987Solver
             addParameter(ip, 'context', [], @(x) ~isempty(x))
             addParameter(ip, 'sigma0', this.sigma0, @(x) isscalar(x) && x <= 1)
             addParameter(ip, 'fileprefix', this.fileprefix, @ischar)
+            addParameter(ip, 'Dt', [], @isnumeric)
             parse(ip, varargin{:})
             ipr = ip.Results;            
             
@@ -59,6 +62,7 @@ classdef DispersedMartin1987Solver
             this.times_sampled = this.model.times_sampled;             %  
             this.sigma0 = ipr.sigma0;            
             this.fileprefix = ipr.fileprefix;
+            this.Dt = ipr.Dt;
         end
         
         function fprintfModel(this)
@@ -68,6 +72,7 @@ classdef DispersedMartin1987Solver
             end 
             fprintf('\tT0 => %g\n', this.model.T0); 
             fprintf('\tTf => %g\n', this.model.Tf); 
+            fprintf('\tDt = %f\n', this.Dt);
         end
         function [k,sk] = k1(this, varargin)
             [k,sk] = find_result(this, 'k1');
@@ -120,18 +125,45 @@ classdef DispersedMartin1987Solver
             ts = this.times_sampled;
             T0 = this.model.T0 + ts(idx0);
             Tf = this.model.Tf + ts(idx0);
-            T = mloxygen.DispersedMartin1987Model.T;
+            RR = mlraichle.RaichleRegistry.instance();
+            tBuffer = RR.tBuffer;
             
             tsWindow = T0 <= ts & ts <= Tf;
             tac = this.Measurement(tsWindow);
             tacTimeRange = ts(tsWindow);  
-            rTacTimeRange = floor(tacTimeRange);
-            aif_0_f = this.artery_interpolated(T+rTacTimeRange(1)+1:T+rTacTimeRange(end)+1);
+            rTacTimeRange = ceil(tacTimeRange);
+            aif_0_f = this.artery_interpolated(tBuffer+rTacTimeRange(1)+1:tBuffer+rTacTimeRange(end)+1);
             
             scale = 1 / mlpet.TracerKinetics.RATIO_SMALL_LARGE_HCT;
             ks_ = scale * ...
                 trapz(tacTimeRange, tac) / ...
                 trapz(aif_0_f);
+            
+            this.results_ = struct('ks', ks_); 
+            if ~this.quiet
+                fprintfModel(this)
+            end
+            if this.visualize
+                plot(this)
+            end
+        end 
+        function this = solve_with_makima(this, varargin)            
+            T0 = this.model.T0;
+            Tf = this.model.Tf;
+            
+            dMeasurement = diff(this.Measurement);
+            [~,idxdM] = max(dMeasurement > 0.1*max(dMeasurement));
+            Measurement_ = makima( ...
+                this.times_sampled(idxdM:end), ...
+                this.Measurement(idxdM:end), ...
+                this.times_sampled(idxdM):this.times_sampled(end));
+            [~,idxai] = max(this.artery_interpolated > 0.1*max(this.artery_interpolated));
+            artery_interpolated_ = this.artery_interpolated(idxai:end);
+            
+            scale = 1 / mlpet.TracerKinetics.RATIO_SMALL_LARGE_HCT;
+            ks_ = scale * ...
+                trapz(Measurement_(T0+1:Tf+1)) / ...
+                trapz(artery_interpolated_(T0+1:Tf+1));
             
             this.results_ = struct('ks', ks_); 
             if ~this.quiet
@@ -148,6 +180,7 @@ classdef DispersedMartin1987Solver
             end
             s = [s sprintf('\tT0 => %g\n', this.model.T0)]; 
             s = [s sprintf('\tTf => %g\n', this.model.Tf)]; 
+            s = [s sprintf('\tDt = %f\n', this.Dt)];
         end 
  	end 
     
