@@ -9,14 +9,10 @@ classdef DispersedNumericMartin1987 < handle & mlpet.AugmentedData & mloxygen.Ma
     
     properties (Constant)   
         LENK = 1
-        T = mloxygen.DispersedMartin1987Model.T
     end
     
     properties (Dependent)
         artery_sampled
-    end
-    
-    properties 
         Delta
         Dt % time-shift for AIF; Dt < 0 shifts backwards in time.
     end
@@ -43,7 +39,6 @@ classdef DispersedNumericMartin1987 < handle & mlpet.AugmentedData & mloxygen.Ma
             addParameter(ip, 'scanner', [], @(x) isa(x, 'mlpet.AbstractDevice'))
             addParameter(ip, 'arterial', [], @(x) isa(x, 'mlpet.AbstractDevice'))          
             addParameter(ip, 'roi', [], @(x) isa(x, 'mlfourd.ImagingContext2'))
-            addParameter(ip, 'T', DispersedNumericMartin1987.T, @isscalar)
             addParameter(ip, 'T0', 120, @isscalar)
             addParameter(ip, 'Tf', 240, @isscalar)
             parse(ip, devkit, varargin{:})
@@ -63,36 +58,6 @@ classdef DispersedNumericMartin1987 < handle & mlpet.AugmentedData & mloxygen.Ma
                 'T0', ipr.T0, ...
                 'Tf', min([ipr.Tf max(timesMid_) length(aif_)-1]), ...
                 varargin{:});
-        end  
-        function [tac__,timesMid__,aif__,Dt] = mixTacAif(devkit, varargin)
-            
-            ip = inputParser;
-            ip.KeepUnmatched = true;
-            addRequired(ip, 'devkit', @(x) isa(x, 'mlpet.IDeviceKit'))
-            addParameter(ip, 'scanner', [], @(x) isa(x, 'mlpet.AbstractDevice'))
-            addParameter(ip, 'arterial', [], @(x) isa(x, 'mlpet.AbstractDevice'))
-            addParameter(ip, 'roi', [], @(x) isa(x, 'mlfourd.ImagingContext2'))
-            addParameter(ip, 'T', [], @isscalar)
-            parse(ip, devkit, varargin{:})
-            ipr = ip.Results;
-            T = ipr.T;
-            
-            % scannerDevs provide calibrations & ROI-volume averaging            
-            s = ipr.scanner.volumeAveraged(ipr.roi);
-            tac = s.activityDensity();
-            tac(tac < 0) = 0;
-            tac__ = tac;
-            timesMid__ = s.timesMid;
-            
-            % arterialDevs calibrate & align arterial times-series to localized scanner time-series            
-            a = ipr.arterial;
-            [a, ~] = devkit.alignArterialToScannerCoarsely(a, s);
-            aif = a.activityDensity();
-            t = a.times(a.index0:a.indexF) - a.time0 - seconds(s.datetime0 - a.datetime0);
-            aif = makima([-T t], [0 aif], -T:s.timesMid(end));            
-            aif(aif < 0) = 0;                        
-            aif__ = aif;
-            Dt = a.Dt;
         end
     end
     
@@ -102,7 +67,13 @@ classdef DispersedNumericMartin1987 < handle & mlpet.AugmentedData & mloxygen.Ma
         
         function g = get.artery_sampled(this)
             g = this.model.solutionOnScannerFrames( ...
-                this.artery_interpolated(this.T+1:end), this.times_sampled);
+                this.artery_interpolated(this.tBuffer+1:end), this.times_sampled);
+        end
+        function g = get.Delta(~)
+            g = 0;
+        end
+        function g = get.Dt(this)
+            g = this.strategy_.Dt;
         end
         
         %%
@@ -122,7 +93,7 @@ classdef DispersedNumericMartin1987 < handle & mlpet.AugmentedData & mloxygen.Ma
             ipr.roi = mlfourd.ImagingContext2(ipr.roi);
             ipr.roi = ipr.roi.binarized();
             
-            artery_interpolated1 = this.artery_interpolated(this.T+1:end);
+            artery_interpolated1 = this.artery_interpolated(this.tBuffer+1:end);
             avec = this.model.solutionOnScannerFrames(artery_interpolated1, this.times_sampled);
             
             roibin = logical(ipr.roi);
@@ -158,7 +129,7 @@ classdef DispersedNumericMartin1987 < handle & mlpet.AugmentedData & mloxygen.Ma
             else
                 artery_interpolated1 = this.artery_interpolated;
             end 
-            artery_interpolated1 = artery_interpolated1(this.T+1:end);
+            artery_interpolated1 = artery_interpolated1(this.tBuffer+1:end);
             avec = this.model.solutionOnScannerFrames(artery_interpolated1, this.times_sampled);
             
             roibin = logical(this.roi);
@@ -213,7 +184,6 @@ classdef DispersedNumericMartin1987 < handle & mlpet.AugmentedData & mloxygen.Ma
  			%% DISPERSEDNUMERICMARTIN1987
             %  @param ho is numeric.
             %  @param devkit is mlpet.IDeviceKit.   
-            %  @param Dt is numeric, s of time-shifting for AIF.
             %  
             %  for mloxygen.DispersedMartin1987Model: 
             %  @param times_sampled for scanner is typically not uniform.
@@ -234,14 +204,12 @@ classdef DispersedNumericMartin1987 < handle & mlpet.AugmentedData & mloxygen.Ma
             ip.KeepUnmatched = true;
             addParameter(ip, 'oc', [], @isnumeric)
             addParameter(ip, 'solver', '', @ischar)
-            addParameter(ip, 'Dt', 0, @isscalar)
             parse(ip, varargin{:});
             ipr = ip.Results;
             
             this.measurement = ipr.oc;
             this.strategy_ = mloxygen.DispersedMartin1987Solver( ...
                 'context', this, varargin{:});
-            this.Dt = ipr.Dt;
  		end
  	end 
 
