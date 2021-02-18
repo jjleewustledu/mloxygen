@@ -19,23 +19,30 @@ classdef Mintun1984 < handle & mlpet.TracerKineticsStrategy
     methods
         function ks = buildKs(this, varargin)
             this = solve(this, varargin{:});
-            ks = [k1(this) k2(this)];
+            ks = [k1(this) k2(this) k3(this)];
         end
         function [k,sk] = k1(this, varargin)
-            %% k1 == E \in [0 1]
+            %% k1 == oef \in [0 1]
             
             [k,sk] = k1(this.strategy_, varargin{:});
         end
         function [k,sk] = k2(this, varargin)
-            %% k2 == metabFrac \in [0 1]
+            %% k2 == metab rate, 1/s
             
             [k,sk] = k2(this.strategy_, varargin{:});
         end
-        function ks_ = ks(this, varargin)
-            ks_ = this.os(varargin{:});
+        function [k,sk] = k3(this, varargin)
+            %% k3 == metab amplitude, unit-less
+            
+            [k,sk] = k3(this.strategy_, varargin{:});
         end
-        function os_ = os(this, varargin)
-            %% os == [metabf oef]
+        function [k,sk] = k4(this, varargin)
+            %% k4 == Delta, for dispersion of aif
+            
+            [k,sk] = k4(this.strategy_, varargin{:});
+        end
+        function ks_ = ks(this, varargin)
+            %% ks == [oef meta-rate meta-amplitude]
             
             ip = inputParser;
             ip.KeepUnmatched = true;
@@ -45,18 +52,23 @@ classdef Mintun1984 < handle & mlpet.TracerKineticsStrategy
             
             k(1) = k1(this.strategy_, varargin{:});
             k(2) = k2(this.strategy_, varargin{:});
+            k(3) = k3(this.strategy_, varargin{:});
+            k(4) = k4(this.strategy_, varargin{:});
              
             roibin = logical(this.roi);
-            os_ = copy(this.roi.fourdfp);
-            os_.img = zeros([size(this.roi) length(k)]);
+            ks_ = copy(this.roi.fourdfp);
+            ks_.img = zeros([size(this.roi) length(k)]);
             for t = 1:length(k)
                 img = zeros(size(this.roi), 'single');
                 img(roibin) = k(t);
-                os_.img(:,:,:,t) = img;
+                ks_.img(:,:,:,t) = img;
             end
-            os_.fileprefix = this.sessionData.osOnAtlas('typ', 'fp', 'tags', [this.blurTag this.regionTag]);
-            os_ = imagingType(ipr.typ, os_);
-        end    
+            ks_.fileprefix = this.sessionData.osOnAtlas('typ', 'fp', 'tags', [this.blurTag this.regionTag]);
+            ks_ = imagingType(ipr.typ, ks_);
+        end 
+        function os_ = os(this, varargin)
+            os_ = this.ks(varargin{:});
+        end   
     end
     
     %% PROTECTED
@@ -65,11 +77,6 @@ classdef Mintun1984 < handle & mlpet.TracerKineticsStrategy
  		function this = Mintun1984(varargin)
             this = this@mlpet.TracerKineticsStrategy(varargin{:});
  		end
-        function that = copyElement(this)
-            %%  See also web(fullfile(docroot, 'matlab/ref/matlab.mixin.copyable-class.html'))
-            
-            that = copyElement@matlab.mixin.Copyable(this);
-        end
  	end 
 
 	%  Created with Newcl by John J. Lee after newfcn by Frank Gonzalez-Morphy
