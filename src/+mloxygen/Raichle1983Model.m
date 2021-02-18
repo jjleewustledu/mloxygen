@@ -89,11 +89,11 @@ classdef (Abstract) Raichle1983Model < mlpet.TracerKineticsModel
                 case 'g'
                     this.map('k2') = struct('min', 0.017,  'max', 0.0266, 'init', 0.0218,  'sigma', 0.002); % PS / s
                     this.map('k3') = struct('min', 0.738,  'max', 1.06,   'init', 1.02,    'sigma', 0.05); % lambda in mL/mL  
-                    %this.map('k3') = struct('min', 0.987, 'max', 1.06,  'init', 1.02,    'sigma', 0.05); % lambda in mL/mL                    
+                    %this.map('k3') = struct('min', 0.987, 'max', 1.06,       'init', 1.02,    'sigma', 0.05); % lambda in mL/mL                    
                 case 'w'
                     this.map('k2') = struct('min', 0.0137, 'max', 0.0142, 'init', 0.014,   'sigma', 0.002); % PS / s
                     this.map('k3') = struct('min', 0.608,  'max', 0.882,  'init', 0.851,   'sigma', 0.05); % lambda in mL/mL
-                    %this.map('k3') = struct('min', 0.819,  'max', 0.882, 'init', 0.851,   'sigma', 0.05); % lambda in mL/mL
+                    %this.map('k3') = struct('min', 0.819,  'max', 0.882,     'init', 0.851,   'sigma', 0.05); % lambda in mL/mL
                 case 's' % subcortical
                     this.map('k2') = struct('min', 0.0159, 'max', 0.0215, 'init', 0.0187,  'sigma', 0.002); % PS / s
                     this.map('k3') = struct('min', 0.738,  'max', 0.97,   'init', 0.924,   'sigma', 0.05); % lambda in mL/mL
@@ -120,7 +120,7 @@ classdef (Abstract) Raichle1983Model < mlpet.TracerKineticsModel
             end
             if ipr.Dt ~= 0
                 times = 0:length(ipr.aif)-1;
-                aif = pchip(times - ipr.Dt, ipr.aif, times); % remove the delay Dt found by model
+                aif = makima(times - ipr.Dt, ipr.aif, times); % remove the delay Dt found by model
             else
                 aif = ipr.aif;
             end

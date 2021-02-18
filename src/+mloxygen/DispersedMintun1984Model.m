@@ -62,9 +62,11 @@ classdef DispersedMintun1984Model < mloxygen.Mintun1984Model
         end
         function loss = loss_function(ks, fs, artery_interpolated, times_sampled, measurement, ~)
             import mloxygen.DispersedMintun1984Model.sampled  
+            RR = mlraichle.RaichleRegistry.instance();
+            tBuffer = RR.tBuffer;
             estimation  = sampled(ks, fs, artery_interpolated, times_sampled);
             measurement = measurement(1:length(estimation));
-            positive    = measurement > 0.05*max(measurement);
+            positive    = measurement > 0.05*max(measurement) & times_sampled < tBuffer + 120;
             eoverm      = estimation(positive)./measurement(positive);
             Q           = mean(abs(1 - eoverm));
             %Q           = sum((1 - eoverm).^2);
@@ -75,8 +77,11 @@ classdef DispersedMintun1984Model < mloxygen.Mintun1984Model
             %  metabf described in Fig. 7.
             
             m = containers.Map;
-            m('k1') = struct('min', 0, 'max', 1, 'init', 0.5,  'sigma', 0.01); % unit-less metabf
-            m('k2') = struct('min', 0, 'max', 1, 'init', 0.44, 'sigma', 0.01); % unit-less oef
+            m('k1') = struct('min', 0.26, 'max', 0.62, 'init', 0.44, 'sigma', 0.01); % oef +/- 3 sd
+            %m('k1') = struct('min', 0.4,  'max', 0.5,  'init', 0.44, 'sigma', 0.01); % oef +/- 3 sd
+            m('k2') = struct('min', 0.01, 'max', 0.1,  'init', 0.05, 'sigma', 0.01); % rate for sigmoidal inflow
+            m('k3') = struct('min', 1e-5, 'max', 1e-2, 'init', 1e-3, 'sigma', 0.01); % rate for exp outflow
+            m('k4') = struct('min', 0.01, 'max', 1,    'init', 1,    'sigma', 0.1); % Delta for cerebral dispersion
         end
         function qs   = sampled(ks, fs, artery_interpolated, times_sampled)
             %  @param artery_interpolated is uniformly sampled at high sampling freq.
@@ -87,6 +92,15 @@ classdef DispersedMintun1984Model < mloxygen.Mintun1984Model
             qs = solution(ks, fs, artery_interpolated);
             qs = solutionOnScannerFrames(qs, times_sampled);
         end
+        function y = sigmoid(x)
+            %if x >= 0
+            %    z = exp(-x);
+            %    y = 1./(1 + z);
+            %else
+                z = exp(x);
+                y = z./(1 + z);
+            %end            
+        end
         function loss = simulanneal_objective(ks, fs, artery_interpolated, times_sampled, qs0, sigma0)
             import mloxygen.DispersedMintun1984Model.sampled          
             qs = sampled(ks, fs, artery_interpolated, times_sampled);            
@@ -96,48 +110,58 @@ classdef DispersedMintun1984Model < mloxygen.Mintun1984Model
             %  @param artery_interpolated is uniform with high sampling freq. starting at time = 0.
 
             import mlpet.AerobicGlycolysisKit
+            import mloxygen.DispersedMintun1984Model.sigmoid
             
+            RR = mlraichle.RaichleRegistry.instance();
+            tBuffer = RR.tBuffer;
             ALPHA = 0.005670305; % log(2)/halflife in 1/s
-            T = mloxygen.DispersedMintun1984Model.T;
-            U = T + 91; % cf. Mintun1984
+            [~,idx0] = max(artery_interpolated > 0.05*max(artery_interpolated));
+            idxU = idx0 + 90; % cf. Mintun1984
             
-            metabf = ks(1);
-            oef = ks(2);
+            oef = ks(1);
+            metab2 = ks(2); 
+            metab3 = ks(3); 
+            Delta = ks(4);
             f = fs(1);
             PS = fs(2);
             lambda = fs(3); 
-            Delta = fs(4);
-%             Dt = round(fs(5));
             v1 = fs(6);
             m = 1 - exp(-PS/f);
             n = length(artery_interpolated);
             times = 0:1:n-1;
-            times = times - T;
              
             % use Delta, metabf
             auc0 = trapz(artery_interpolated);
             artery_interpolated1 = conv(artery_interpolated, exp(-Delta*times));
             artery_interpolated1 = artery_interpolated1(1:n);
             artery_interpolated1 = artery_interpolated1*auc0/trapz(artery_interpolated1);
+
+            shape = zeros(1, n);
+            %stimes = times0(1:n-idx0) + 1e-6;
+            %shape(idx0+1:n) = stimes.^(metab2-1) .* exp(-metab3*stimes);
+            stimes1 = times(1:idxU-idx0) - times(idxU-idx0);
+            x = metab2*stimes1;
+            shape(idx0+1:idxU) = (sigmoid(x)      - sigmoid(x(1)))/ ...
+                                 (sigmoid(x(end)) - sigmoid(x(1)));
             
-            shape = ones(size(artery_interpolated1));
-%             if Dt < 0
-                shape(1:U) = linspace(0, metabf, U);
-                shape(U+1:end) = linspace(metabf, 1, length(shape)-U);
-                artery_h2o_dc = metabf*artery_interpolated1(U)*2^((U-1)/122.2416)*shape;
-%             else
-%                 shape(1:1+Dt) = 0;
-%                 shape(1+Dt:U+Dt) = linspace(0, metabf, U);
-%                 shape(U+1+Dt:end) = linspace(metabf, 1, length(shape)-U-Dt);
-%                 artery_h2o_dc = metabf*artery_interpolated1(U+Dt)*2^((U-1+Dt)/122.2416)*shape;
-%             end
-            artery_h2o = artery_h2o_dc .* 2.^(-times/122.2416);
+            stimes2 = times(1:n-idxU);
+            shape(idxU+1:n) = exp(-metab3*stimes2);
+            
+            ductimes = zeros(1,n);
+            ductimes(idx0+1:n) = 0:(n-idx0-1);
+            ducshape = shape .* 2.^(-ductimes/122.2416); % decay-uncorrected
+            
+            %metabScale = 0.1*artery_interpolated1(idxU)/ducshape(idxU);
+            metabScale = 0.06*trapz(artery_interpolated1(1:idxU)) / ...
+                              trapz(ducshape(1:idxU)); % water of metab is 6% of cumulative activity
+            artery_h2o = metabScale*ducshape;
             artery_o2 = artery_interpolated1 - artery_h2o;
-            artery_o2(artery_o2 < 0) = 0;
+            artery_o2(artery_o2 < 0) = 0;            
             
             % compartment 2
-            rho2 =  m*f*conv(exp(-m*f*times/lambda - ALPHA*times), artery_h2o) + ...
-                oef*m*f*conv(exp(-m*f*times/lambda - ALPHA*times), artery_o2);
+            kernel = exp(-m*f*times/lambda - ALPHA*times);
+            rho2 =  m*f*conv(kernel, artery_h2o) + ...
+                oef*m*f*conv(kernel, artery_o2);
             
             % compartment 1
             % v_post = 0.83*v1;
@@ -147,7 +171,8 @@ classdef DispersedMintun1984Model < mloxygen.Mintun1984Model
             
             % use E, f, lambda
             rho = rho1(1:n) + rho2(1:n);
-            rho = rho(T+1:n);
+        
+            rho = rho(tBuffer+1:n);
         end        
     end
 
@@ -171,7 +196,7 @@ classdef DispersedMintun1984Model < mloxygen.Mintun1984Model
             Dt = ipr.fs(5);
             if Dt ~= 0
                 times = 0:length(ipr.aif)-1;
-                aif = pchip(times - Dt, ipr.aif, times); % remove the delay Dt found by model
+                aif = makima(times - Dt, ipr.aif, times); % remove the delay Dt found by model
             else
                 aif = ipr.aif;
             end

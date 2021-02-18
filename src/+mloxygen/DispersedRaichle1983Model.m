@@ -12,10 +12,11 @@ classdef DispersedRaichle1983Model < mloxygen.Raichle1983Model
     methods (Static)
         function loss = loss_function(ks, artery_interpolated, times_sampled, measurement, ~)
             import mloxygen.DispersedRaichle1983Model.sampled  
-            T = mloxygen.DispersedRaichle1983Model.T;
+            RR          = mlraichle.RaichleRegistry.instance();
+            tBuffer     = RR.tBuffer;
             estimation  = sampled(ks, artery_interpolated, times_sampled);
             measurement = measurement(1:length(estimation));
-            positive    = measurement > 0.05*max(measurement) & times_sampled < T + 120;
+            positive    = measurement > 0.05*max(measurement) & times_sampled < tBuffer + 120;
             eoverm      = estimation(positive)./measurement(positive);
             Q           = mean(abs(1 - eoverm));
             %Q           = mean((1 - eoverm).^2);
@@ -36,12 +37,13 @@ classdef DispersedRaichle1983Model < mloxygen.Raichle1983Model
             loss = 0.5 * sum((1 - qs ./ qs0).^2) / sigma0^2; % + sum(log(sigma0*qs0)); % sigma ~ sigma0 * qs0
         end
         function qs   = solution(ks, artery_interpolated)
-            %  @param artery_interpolated is uniformly sampled with at high sampling freq. starting at time = -T.
-            %         First T seconds of artery_interpolated are used for modeling but not reported
+            %  @param artery_interpolated is uniformly sampled with at high sampling freq. starting at time = -tBuffer.
+            %         First tBuffer seconds of artery_interpolated are used for modeling but not reported
             %         in returned qs.  
             %  @return qs is the modeled scanner emissions, uniformly sampled.
-
-            T = mloxygen.DispersedRaichle1983Model.T;
+            
+            RR = mlraichle.RaichleRegistry.instance();
+            tBuffer = RR.tBuffer;
             ALPHA = 0.005670305; % log(2)/halflife in 1/s
             %E_MIN = 0.7;
             %E_MAX = 0.93;
@@ -53,11 +55,8 @@ classdef DispersedRaichle1983Model < mloxygen.Raichle1983Model
             E = 1 - exp(-PS/f);
             %E = max(1 - exp(-PS/f), E_MIN);
             %E = min(E, E_MAX);
-            %[~,idx] = max(artery_interpolated > 0.1*max(artery_interpolated));            
-            %n = min(length(artery_interpolated), idx+119); % limit duration of scan sampling
             n = length(artery_interpolated);
             times = 0:1:n-1;
-            times = times - T;
              
             % use Delta
             auc0 = trapz(artery_interpolated);
@@ -66,8 +65,9 @@ classdef DispersedRaichle1983Model < mloxygen.Raichle1983Model
             artery_interpolated1 = artery_interpolated1*auc0/trapz(artery_interpolated1);
             
             % use E, f, lambda
-            qs = E*f*conv(exp(-E*f*times/lambda - ALPHA*times), artery_interpolated1);
-            qs = qs(T+1:n);
+            kernel = exp(-E*f*times/lambda - ALPHA*times);
+            qs = E*f*conv(kernel, artery_interpolated1);
+            qs = qs(tBuffer+1:n);
         end        
     end
 
