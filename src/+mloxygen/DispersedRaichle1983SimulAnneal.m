@@ -8,6 +8,7 @@ classdef DispersedRaichle1983SimulAnneal < mloxygen.Raichle1983SimulAnneal
 
     properties
         Dt
+        registry
     end
     
 	methods		  
@@ -20,16 +21,18 @@ classdef DispersedRaichle1983SimulAnneal < mloxygen.Raichle1983SimulAnneal
             addParameter(ip, 'Dt', [], @isnumeric)
             parse(ip, varargin{:})
             this.Dt = ip.Results.Dt;
+            this.registry = mlraichle.RaichleRegistry.instance();
         end    
         
         function fprintfModel(this)
             fprintf('Simulated Annealing:\n');            
             for ky = 1:length(this.ks)
-                fprintf('\tk%i = %f\n', ky, this.ks(ky));
-            end           
-            fprintf('\tE = 1 - exp(-PS/f) = %f\n', 1 - exp(-this.ks(2)/this.ks(1)))
-            fprintf('\tsigma0 = %f\n', this.sigma0);
-            fprintf('\tDt = %f\n', this.Dt);
+                fprintf('\tk%i = %g\n', ky, this.ks(ky));
+            end 
+            fprintf('\tE = 1 - exp(-PS/f) = %g\n', 1 - exp(-this.ks(2)/this.ks(1)))          
+            fprintf('\tDt = %g\n', this.Dt);
+            fprintf('\ttBuffer = %g\n', this.registry.tBuffer)
+            fprintf('\tsigma0 = %g\n', this.sigma0);
             for ky = this.map.keys
                 fprintf('\tmap(''%s'') => %s\n', ky{1}, struct2str(this.map(ky{1})));
             end
@@ -37,11 +40,12 @@ classdef DispersedRaichle1983SimulAnneal < mloxygen.Raichle1983SimulAnneal
         function s = sprintfModel(this)
             s = sprintf('Simulated Annealing:\n');
             for ky = 1:length(this.ks)
-                s = [s sprintf('\tk%i = %f\n', ky, this.ks(ky))]; %#ok<AGROW>
+                s = [s sprintf('\tk%i = %g\n', ky, this.ks(ky))]; %#ok<AGROW>
             end
-            s = [s sprintf('\tDt = %f\n', this.Dt)];
-            s = [s sprintf('\tE = 1 - exp(-PS/f) = %f\n', 1 - exp(-this.ks(2)/this.ks(1)))];
-            s = [s sprintf('\tsigma0 = %f\n', this.sigma0)];
+            s = [s sprintf('\tE = 1 - exp(-PS/f) = %g\n', 1 - exp(-this.ks(2)/this.ks(1)))];
+            s = [s sprintf('\tDt = %g\n', this.Dt)];
+            s = [s sprintf('\ttBuffer = %g\n', this.registry.tBuffer)];
+            s = [s sprintf('\tsigma0 = %g\n', this.sigma0)];
             for ky = this.map.keys
                 s = [s sprintf('\tmap(''%s'') => %s\n', ky{1}, struct2str(this.map(ky{1})))]; %#ok<AGROW>
             end

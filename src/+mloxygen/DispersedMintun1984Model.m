@@ -129,6 +129,7 @@ classdef DispersedMintun1984Model < mloxygen.Mintun1984Model
             m = 1 - exp(-PS/f);
             n = length(artery_interpolated);
             times = 0:1:n-1;
+            timesb = times; % - tBuffer;
              
             % use Delta, metabf
             auc0 = trapz(artery_interpolated);
@@ -159,7 +160,7 @@ classdef DispersedMintun1984Model < mloxygen.Mintun1984Model
             artery_o2(artery_o2 < 0) = 0;            
             
             % compartment 2
-            kernel = exp(-m*f*times/lambda - ALPHA*times);
+            kernel = exp(-m*f*timesb/lambda - ALPHA*timesb);
             rho2 =  m*f*conv(kernel, artery_h2o) + ...
                 oef*m*f*conv(kernel, artery_o2);
             

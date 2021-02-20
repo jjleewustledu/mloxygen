@@ -21,6 +21,7 @@ classdef DispersedMartin1987Solver
         zoom = 1
         
         Dt
+        registry
  	end
     
 	properties (Dependent)   
@@ -63,6 +64,7 @@ classdef DispersedMartin1987Solver
             this.sigma0 = ipr.sigma0;            
             this.fileprefix = ipr.fileprefix;
             this.Dt = ipr.Dt;
+            this.registry = mlraichle.RaichleRegistry.instance();
         end
         
         function fprintfModel(this)
@@ -72,7 +74,8 @@ classdef DispersedMartin1987Solver
             end 
             fprintf('\tT0 => %g\n', this.model.T0); 
             fprintf('\tTf => %g\n', this.model.Tf); 
-            fprintf('\tDt = %f\n', this.Dt);
+            fprintf('\tDt = %g\n', this.Dt);
+            fprintf('\ttBuffer = %g\n', this.registry.tBuffer)
         end
         function [k,sk] = k1(this, varargin)
             [k,sk] = find_result(this, 'k1');
@@ -82,7 +85,7 @@ classdef DispersedMartin1987Solver
             addParameter(ip, 'showAif', true, @islogical)
             addParameter(ip, 'xlim', [-10 500], @isnumeric)            
             addParameter(ip, 'ylim', [], @isnumeric)
-            addParameter(ip, 'zoom', 10, @isnumeric)
+            addParameter(ip, 'zoom', 25, @isnumeric)
             parse(ip, varargin{:})
             ipr = ip.Results;
             this.zoom = ipr.zoom;
@@ -180,7 +183,8 @@ classdef DispersedMartin1987Solver
             end
             s = [s sprintf('\tT0 => %g\n', this.model.T0)]; 
             s = [s sprintf('\tTf => %g\n', this.model.Tf)]; 
-            s = [s sprintf('\tDt = %f\n', this.Dt)];
+            s = [s sprintf('\tDt = %g\n', this.Dt)];
+            s = [s sprintf('\ttBuffer = %g\n', this.registry.tBuffer)];
         end 
  	end 
     

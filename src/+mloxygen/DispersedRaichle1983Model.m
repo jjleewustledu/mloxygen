@@ -57,6 +57,7 @@ classdef DispersedRaichle1983Model < mloxygen.Raichle1983Model
             %E = min(E, E_MAX);
             n = length(artery_interpolated);
             times = 0:1:n-1;
+            timesb = times; % - tBuffer;
              
             % use Delta
             auc0 = trapz(artery_interpolated);
@@ -65,7 +66,7 @@ classdef DispersedRaichle1983Model < mloxygen.Raichle1983Model
             artery_interpolated1 = artery_interpolated1*auc0/trapz(artery_interpolated1);
             
             % use E, f, lambda
-            kernel = exp(-E*f*times/lambda - ALPHA*times);
+            kernel = exp(-E*f*timesb/lambda - ALPHA*timesb);
             qs = E*f*conv(kernel, artery_interpolated1);
             qs = qs(tBuffer+1:n);
         end        
