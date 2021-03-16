@@ -32,6 +32,8 @@ classdef DispersedRaichle1983SimulAnneal < mloxygen.Raichle1983SimulAnneal
             fprintf('\tE = 1 - exp(-PS/f) = %g\n', 1 - exp(-this.ks(2)/this.ks(1)))          
             fprintf('\tDt = %g\n', this.Dt);
             fprintf('\ttBuffer = %g\n', this.registry.tBuffer)
+            fprintf('\ttimeCliff = %g\n', this.timeCliff)
+            fprintf('\tloss = %g\n', this.loss())
             fprintf('\tsigma0 = %g\n', this.sigma0);
             for ky = this.map.keys
                 fprintf('\tmap(''%s'') => %s\n', ky{1}, struct2str(this.map(ky{1})));
@@ -45,6 +47,8 @@ classdef DispersedRaichle1983SimulAnneal < mloxygen.Raichle1983SimulAnneal
             s = [s sprintf('\tE = 1 - exp(-PS/f) = %g\n', 1 - exp(-this.ks(2)/this.ks(1)))];
             s = [s sprintf('\tDt = %g\n', this.Dt)];
             s = [s sprintf('\ttBuffer = %g\n', this.registry.tBuffer)];
+            s = [s sprintf('\ttimeCliff = %g\n', this.timeCliff)];
+            s = [s sprintf('\tloss = %g\n', this.loss())];
             s = [s sprintf('\tsigma0 = %g\n', this.sigma0)];
             for ky = this.map.keys
                 s = [s sprintf('\tmap(''%s'') => %s\n', ky{1}, struct2str(this.map(ky{1})))]; %#ok<AGROW>

@@ -6,6 +6,10 @@ classdef Raichle1983SimulAnneal < mlpet.TracerSimulAnneal & mloxygen.Raichle1983
  	%  last modified $LastChangedDate$ and placed into repository /Users/jjlee/MATLAB-Drive/mloxygen/src/+mloxygen.
  	%% It was developed on Matlab 9.7.0.1434023 (R2019b) Update 6 for MACI64.  Copyright 2020 John Joowon Lee.
 
+    properties
+        timeCliff
+    end
+    
 	methods
  		function this = Raichle1983SimulAnneal(varargin)
  			%% RAICHLE1983SIMULANNEAL
@@ -14,6 +18,12 @@ classdef Raichle1983SimulAnneal < mlpet.TracerSimulAnneal & mloxygen.Raichle1983
             %  @param fileprefix.
 
  			this = this@mlpet.TracerSimulAnneal(varargin{:});
+            
+            ip = inputParser;
+            ip.KeepUnmatched = true;
+            addParameter(ip, 'timeCliff', Inf, @isscalar)
+            parse(ip, varargin{:})
+            this.timeCliff = ip.Results.timeCliff;
             
             [this.ks_lower,this.ks_upper,this.ks0] = remapper(this);
             this.artery_interpolated = this.model.artery_interpolated;
@@ -76,7 +86,7 @@ classdef Raichle1983SimulAnneal < mlpet.TracerSimulAnneal & mloxygen.Raichle1983
             end
  			[ks_,sse,exitflag,output] = simulannealbnd( ...
                 @(ks__) ipr.loss_function( ...
-                       ks__, this.artery_interpolated, this.times_sampled, double(this.Measurement), this.sigma0), ...
+                       ks__, this.artery_interpolated, this.times_sampled, double(this.Measurement), this.timeCliff), ...
                 this.ks0, this.ks_lower, this.ks_upper, options); 
             
             this.results_ = struct('ks0', this.ks0, 'ks', ks_, 'sse', sse, 'exitflag', exitflag, 'output', output); 

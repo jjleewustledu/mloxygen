@@ -22,6 +22,7 @@ classdef DispersedMartin1987Solver
         
         Dt
         registry
+        timeCliff
  	end
     
 	properties (Dependent)   
@@ -52,6 +53,7 @@ classdef DispersedMartin1987Solver
             addParameter(ip, 'sigma0', this.sigma0, @(x) isscalar(x) && x <= 1)
             addParameter(ip, 'fileprefix', this.fileprefix, @ischar)
             addParameter(ip, 'Dt', [], @isnumeric)
+            addParameter(ip, 'timeCliff', Inf, @isscalar)
             parse(ip, varargin{:})
             ipr = ip.Results;            
             
@@ -65,6 +67,7 @@ classdef DispersedMartin1987Solver
             this.fileprefix = ipr.fileprefix;
             this.Dt = ipr.Dt;
             this.registry = mlraichle.RaichleRegistry.instance();
+            this.timeCliff = ipr.timeCliff;
         end
         
         function fprintfModel(this)
@@ -96,18 +99,18 @@ classdef DispersedMartin1987Solver
             h = figure;
             times = this.times_sampled;
             
+            if ipr.zoom > 1
+                leg_meas = sprintf('measurement x%i', ipr.zoom);
+            else
+                leg_meas = 'measurement';
+            end
             if ipr.showAif
                 plot(times, ipr.zoom*this.Measurement, ':o', ...
                     0:length(aif)-tBuffer-1, aif(tBuffer+1:end), '--') 
-                if ipr.zoom > 1
-                    leg_aif = sprintf('aif x%i', ipr.zoom);
-                else
-                    leg_aif = 'aif';
-                end
-                legend('measurement', leg_aif)
+                legend(leg_meas, 'aif')
             else
                 plot(times, ipr.zoom*this.Measurement, 'o')                
-                legend('measurement')
+                legend(leg_meas)
             end
             if ~isempty(ipr.xlim); xlim(ipr.xlim); end
             if ~isempty(ipr.ylim); ylim(ipr.ylim); end
@@ -127,9 +130,9 @@ classdef DispersedMartin1987Solver
             [~,idx0] = max(this.Measurement > 0.1*max(this.Measurement));
             ts = this.times_sampled;
             T0 = this.model.T0 + ts(idx0);
-            Tf = this.model.Tf + ts(idx0);
-            RR = mlraichle.RaichleRegistry.instance();
-            tBuffer = RR.tBuffer;
+            Tf = min(this.model.Tf + ts(idx0), this.timeCliff);
+            assert(Tf > T0)
+            tBuffer = this.registry.tBuffer;
             
             tsWindow = T0 <= ts & ts <= Tf;
             tac = this.Measurement(tsWindow);
@@ -141,32 +144,6 @@ classdef DispersedMartin1987Solver
             ks_ = scale * ...
                 trapz(tacTimeRange, tac) / ...
                 trapz(aif_0_f);
-            
-            this.results_ = struct('ks', ks_); 
-            if ~this.quiet
-                fprintfModel(this)
-            end
-            if this.visualize
-                plot(this)
-            end
-        end 
-        function this = solve_with_makima(this, varargin)            
-            T0 = this.model.T0;
-            Tf = this.model.Tf;
-            
-            dMeasurement = diff(this.Measurement);
-            [~,idxdM] = max(dMeasurement > 0.1*max(dMeasurement));
-            Measurement_ = makima( ...
-                this.times_sampled(idxdM:end), ...
-                this.Measurement(idxdM:end), ...
-                this.times_sampled(idxdM):this.times_sampled(end));
-            [~,idxai] = max(this.artery_interpolated > 0.1*max(this.artery_interpolated));
-            artery_interpolated_ = this.artery_interpolated(idxai:end);
-            
-            scale = 1 / mlpet.TracerKinetics.RATIO_SMALL_LARGE_HCT;
-            ks_ = scale * ...
-                trapz(Measurement_(T0+1:Tf+1)) / ...
-                trapz(artery_interpolated_(T0+1:Tf+1));
             
             this.results_ = struct('ks', ks_); 
             if ~this.quiet

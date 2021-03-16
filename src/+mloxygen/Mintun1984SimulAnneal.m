@@ -6,6 +6,10 @@ classdef Mintun1984SimulAnneal < mlpet.TracerSimulAnneal & mloxygen.Mintun1984St
  	%  last modified $LastChangedDate$ and placed into repository /Users/jjlee/MATLAB-Drive/mloxygen/src/+mloxygen.
  	%% It was developed on Matlab 9.9.0.1524771 (R2020b) Update 2 for MACI64.  Copyright 2020 John Joowon Lee.
  	
+    properties
+        timeCliff
+    end
+    
 	methods		  
  		function this = Mintun1984SimulAnneal(varargin)
  			%% MINTUN1984SIMULANNEAL
@@ -14,6 +18,12 @@ classdef Mintun1984SimulAnneal < mlpet.TracerSimulAnneal & mloxygen.Mintun1984St
             %  @param fileprefix.
  			
  			this = this@mlpet.TracerSimulAnneal(varargin{:});
+            
+            ip = inputParser;
+            ip.KeepUnmatched = true;
+            addParameter(ip, 'timeCliff', Inf, @isscalar)
+            parse(ip, varargin{:})
+            this.timeCliff = ip.Results.timeCliff;
             
             [this.ks_lower,this.ks_upper,this.ks0] = remapper(this);
             this.artery_interpolated = this.model.artery_interpolated;
@@ -64,21 +74,22 @@ classdef Mintun1984SimulAnneal < mlpet.TracerSimulAnneal & mloxygen.Mintun1984St
             aif = this.dispersedAif(this.artery_interpolated);
             h = figure;
             times = this.times_sampled;
-            sampled = this.model.sampled(this.ks, this.model.fs_Raichle_Martin, aif, times);
+            sampled = this.model.sampled(this.ks, this.model.fs_Raichle_Martin, aif, times);            
+            
+            if ipr.zoom > 1
+                leg_meas = sprintf('measurement x%i', ipr.zoom);
+            else
+                leg_meas = 'measurement';
+            end
             if ipr.showAif
                 plot(times, ipr.zoom*this.Measurement, ':o', ...
                     times(1:length(sampled)), ipr.zoom*sampled, '-', ...
                     -tBuffer:length(aif)-tBuffer-1, aif, '--') 
-                if ipr.zoom > 1
-                    leg_aif = sprintf('aif x%i', ipr.zoom);
-                else
-                    leg_aif = 'aif';
-                end
-                legend('measurement', 'estimation', leg_aif)
+                legend(leg_meas, 'estimation', 'aif')
             else
                 plot(times, ipr.zoom*this.Measurement, 'o', ...
                     times(1:length(sampled)), ipr.zoom*sampled, '-')                
-                legend('measurement', 'estimation')
+                legend(leg_meas, 'estimation')
             end
             if ~isempty(ipr.xlim); xlim(ipr.xlim); end
             if ~isempty(ipr.ylim); ylim(ipr.ylim); end
@@ -122,7 +133,7 @@ classdef Mintun1984SimulAnneal < mlpet.TracerSimulAnneal & mloxygen.Mintun1984St
             end
  			[ks_,sse,exitflag,output] = simulannealbnd( ...
                 @(ks__) ipr.loss_function( ...
-                       ks__, double(this.model.fs_Raichle_Martin), this.artery_interpolated, this.times_sampled, double(this.Measurement), this.sigma0), ...
+                       ks__, double(this.model.fs_Raichle_Martin), this.artery_interpolated, this.times_sampled, double(this.Measurement), this.timeCliff), ...
                 this.ks0, this.ks_lower, this.ks_upper, options); 
             
             this.results_ = struct('ks0', this.ks0, 'ks', ks_, 'sse', sse, 'exitflag', exitflag, 'output', output); 

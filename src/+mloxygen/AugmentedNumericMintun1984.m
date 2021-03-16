@@ -1,13 +1,13 @@
-classdef AugmentedNumericMartin1987 < handle & mloxygen.DispersedNumericMartin1987
-	%% AUGMENTEDNUMERICMARTIN1987
+classdef AugmentedNumericMintun1984 < handle & mloxygen.DispersedNumericMintun1984
+	%% AUGMENTEDNUMERICMINTUN1984  
 
 	%  $Revision$
- 	%  was created 29-Apr-2020 23:31:38 by jjlee,
+ 	%  was created 09-Feb-2021 23:27:40 by jjlee,
  	%  last modified $LastChangedDate$ and placed into repository /Users/jjlee/MATLAB-Drive/mloxygen/src/+mloxygen.
- 	%% It was developed on Matlab 9.7.0.1319299 (R2019b) Update 5 for MACI64.  Copyright 2020 John Joowon Lee.
-
+ 	%% It was developed on Matlab 9.9.0.1570001 (R2020b) Update 4 for MACI64.  Copyright 2021 John Joowon Lee.
+ 	   
     
-    methods (Static)        
+    methods (Static)
         function [this,tac_,aif_] = createFromDeviceKit(devkit, devkit2, varargin)
             %% adjusts AIF timings for coincidence of inflow with tissue activity from scanner
             %  @param required devkit is mlpet.IDeviceKit.
@@ -16,18 +16,20 @@ classdef AugmentedNumericMartin1987 < handle & mloxygen.DispersedNumericMartin19
             %  @param required scanner2 is an mlpet.AbstractDevice.
             %  @param required arterial is an mlpet.AbstractDevice.
             %  @param required arterial2 is an mlpet.AbstractDevice.
+            %  @param solver is in {'nest' 'simulanneal' 'hmc' 'lm' 'bfgs'}, default := 'simulanneal'.
             %  @param roi is mlfourd.ImagingContext2.
             %  @param roi2 is mlfourd.ImagingContext2.
+            %  @param histology in {'g' 'w' 's'}
             %  @param Dt_aif isscalar.
+            %  @param sigma0, default from mloptimization.SimulatedAnnealing.
+            %  @param fileprefix, default from devkit.
             %  @param fracMixing in [0 1] for mixing tacs and aifs.
-            %  @param T0 isscalar.
-            %  @param Tf isscalar.
             %  @return this.
             %  @return tac_, blurred by ipr.blurFdg.
             %  @return aif_.
             
-            import mloxygen.AugmentedNumericMartin1987
-            import mlpet.AugmentedData.mixTacsAifs 
+            import mloxygen.AugmentedNumericMintun1984
+            import mlpet.AugmentedData.mixTacsAifs          
             
             ip = inputParser;
             ip.KeepUnmatched = true;
@@ -39,53 +41,52 @@ classdef AugmentedNumericMartin1987 < handle & mloxygen.DispersedNumericMartin19
             addParameter(ip, 'arterial2', [], @(x) isa(x, 'mlpet.AbstractDevice'))            
             addParameter(ip, 'roi', [], @(x) isa(x, 'mlfourd.ImagingContext2'))
             addParameter(ip, 'roi2', [], @(x) isa(x, 'mlfourd.ImagingContext2'))
-            addParameter(ip, 'T0', 120, @isscalar)
-            addParameter(ip, 'Tf', 240, @isscalar)
             addParameter(ip, 'Dt_aif', 0, @isscalar)
-            addParameter(ip, 'fracMixing', 0.5, @isscalar)
+            addParameter(ip, 'fracMixing', 0.9, @isscalar)
             parse(ip, devkit, devkit2, varargin{:})
             ipr = ip.Results;
             
             % mix components for augmentation
             [tac_,timesMid_,aif_,Dt] = mixTacsAifs(devkit, devkit2, varargin{:});
-            fp = sprintf('mlglucose_AugmentedNumericMartin1987_createFromDeviceKit_dt%s', datestr(now, 'yyyymmddHHMMSS')); 
+            fp = sprintf('mlglucose_AugmentedNumericMintun1984_createFromDeviceKit_dt%s', datestr(now, 'yyyymmddHHMMSS'));             
+            fs_R_M_ = mloxygen.DispersedMintun1984Model.fs_R_M(devkit.sessionData, ipr.roi);
             
-            this = AugmentedNumericMartin1987( ...
-                'oc', tac_, ...
-                'solver', '', ...
+            this = AugmentedNumericMintun1984( ...
+                'oo', tac_, ...
+                'solver', 'simulanneal', ...
                 'devkit', devkit, ...
                 'Dt', Dt, ...
                 'times_sampled', timesMid_, ...
                 'artery_interpolated', aif_, ...
                 'fileprefix', fp, ...
-                'T0', ipr.T0, ...
-                'Tf', min([ipr.Tf max(timesMid_) length(aif_)-1]), ...
-                varargin{:});
+                'fs_Raichle_Martin', fs_R_M_, ...
+                varargin{:});      
             this.Dt_aif = ipr.Dt_aif;
         end
     end
-    
-    %% PROTECTED
 
+    %% PROTECTED
+    
 	methods (Access = protected)		  
- 		function this = AugmentedNumericMartin1987(varargin)
- 			%% AUGMENTEDNUMERICMARTIN1987
-            %  @param ho is numeric.
+ 		function this = AugmentedNumericMintun1984(varargin)
+ 			%% AUGMENTEDNUMERICMINTUN1984
+            %  @param oo is numeric.
+            %  @param solver is in {'simulanneal'}.
             %  @param devkit is mlpet.IDeviceKit.   
             %  @param Dt is numeric, s of time-shifting for AIF.
             %  
-            %  for mloxygen.DispersedMartin1987Model: 
+            %  for mloxygen.DispersedMintun1984Model: 
+            %  @param fs_Raichle_Martin is numeric, containing model parameters from Raichle1983 & Martin1987.
+            %  @param map is a containers.Map.  Default := DispersedHuang1980Model.preferredMap.
             %  @param times_sampled for scanner is typically not uniform.
             %  @param artery_interpolated must be uniformly interpolated.
- 			%  @param T0 is numeric.
-            %  @param Tf is numeric.
             %
-            %  for mloxygen.DispersedMartin1987Solver:
-            %  @param context is mloxygen.Raichle1983.
+            %  for mloxygen.DispersedMintun1984SimulAnneal:
+            %  @param context is mloxygen.Mintun1984.
             %  @param sigma0.
             %  @param fileprefix.
-            
-            this = this@mloxygen.DispersedNumericMartin1987(varargin{:});
+
+ 			this = this@mloxygen.DispersedNumericMintun1984(varargin{:});
  		end
  	end 
 

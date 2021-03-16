@@ -10,17 +10,15 @@ classdef DispersedRaichle1983Model < mloxygen.Raichle1983Model
  	%% It was developed on Matlab 9.7.0.1434023 (R2019b) Update 6 for MACI64.  Copyright 2020 John Joowon Lee.
  	
     methods (Static)
-        function loss = loss_function(ks, artery_interpolated, times_sampled, measurement, ~)
+        function loss = loss_function(ks, artery_interpolated, times_sampled, measurement, timeCliff)
             import mloxygen.DispersedRaichle1983Model.sampled  
-            RR          = mlraichle.RaichleRegistry.instance();
-            tBuffer     = RR.tBuffer;
             estimation  = sampled(ks, artery_interpolated, times_sampled);
             measurement = measurement(1:length(estimation));
-            positive    = measurement > 0.05*max(measurement) & times_sampled < tBuffer + 120;
+            positive    = measurement > 0.05*max(measurement); % & times_sampled < timeCliff;
             eoverm      = estimation(positive)./measurement(positive);
             Q           = mean(abs(1 - eoverm));
             %Q           = mean((1 - eoverm).^2);
-            loss        = 0.5*Q; % /sigma0^2; % + sum(log(sigma0*measurement)); % sigma ~ sigma0*measurement
+            loss        = Q; % 0.5*Q/sigma0^2 + sum(log(sigma0*measurement)); % sigma ~ sigma0*measurement
         end
         function qs   = sampled(ks, artery_interpolated, times_sampled)
             %  @param artery_interpolated is uniformly sampled at high sampling freq.
@@ -45,16 +43,16 @@ classdef DispersedRaichle1983Model < mloxygen.Raichle1983Model
             RR = mlraichle.RaichleRegistry.instance();
             tBuffer = RR.tBuffer;
             ALPHA = 0.005670305; % log(2)/halflife in 1/s
-            %E_MIN = 0.7;
-            %E_MAX = 0.93;
+            E_MIN = 0.7;
+            E_MAX = 0.93;
             
             f = ks(1);
             PS = ks(2);
             lambda = ks(3); 
             Delta = ks(4);
-            E = 1 - exp(-PS/f);
-            %E = max(1 - exp(-PS/f), E_MIN);
-            %E = min(E, E_MAX);
+            %E = 1 - exp(-PS/f);
+            E = max(1 - exp(-PS/f), E_MIN);
+            E = min(E, E_MAX);
             n = length(artery_interpolated);
             times = 0:1:n-1;
             timesb = times; % - tBuffer;

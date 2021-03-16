@@ -8,7 +8,7 @@ classdef DispersedNumericMintun1984 < handle & mlpet.AugmentedData & mloxygen.Mi
  	
     
     properties (Constant)
-        LENK = 4
+        LENK = 6
     end
     
 	properties (Dependent)
@@ -61,6 +61,7 @@ classdef DispersedNumericMintun1984 < handle & mlpet.AugmentedData & mloxygen.Mi
                 'artery_interpolated', aif_, ...
                 'fileprefix', fp, ...
                 'fs_Raichle_Martin', fs_R_M_, ...
+                'timeCliff', ipr.arterial.timeCliff, ...
                 varargin{:});
         end
     end
@@ -84,7 +85,7 @@ classdef DispersedNumericMintun1984 < handle & mlpet.AugmentedData & mloxygen.Mi
            
         function ks = buildKs(this, varargin)
             this = solve(this, varargin{:});
-            ks = [k1(this) k2(this) k3(this) k4(this) k5(this)];
+            ks = [k1(this) k2(this) k3(this) k4(this) k5(this) loss(this)];
         end 
         function ho  = checkSimulated(this, varargin)
             %% CHECKSIMULATED simulates tissue activity with passed and internal parameters without changing state.
@@ -105,7 +106,7 @@ classdef DispersedNumericMintun1984 < handle & mlpet.AugmentedData & mloxygen.Mi
             sk = nan;
         end
         function ks_ = ks(this, varargin)
-            %% ks == [oef metab-rate metab-amplitude Dt]
+            %% ks == [oef metab-rate metab-amplitude Dt loss]
             
             ip = inputParser;
             ip.KeepUnmatched = true;
@@ -118,6 +119,7 @@ classdef DispersedNumericMintun1984 < handle & mlpet.AugmentedData & mloxygen.Mi
             k(3) = k3(this.strategy_, varargin{:});
             k(4) = k4(this.strategy_, varargin{:});
             k(5) = k5(this);
+            k(6) = loss(this);
              
             roibin = logical(this.roi);
             ks_ = copy(this.roi.fourdfp);

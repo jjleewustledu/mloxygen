@@ -8,7 +8,7 @@ classdef DispersedNumericRaichle1983 < handle & mlpet.AugmentedData & mloxygen.R
  	
     
     properties (Constant)
-        LENK = 4
+        LENK = 6
     end
     
     properties (Dependent)
@@ -58,6 +58,7 @@ classdef DispersedNumericRaichle1983 < handle & mlpet.AugmentedData & mloxygen.R
                 'times_sampled', timesMid_, ...
                 'artery_interpolated', aif_, ...
                 'fileprefix', fp, ...
+                'timeCliff', ip.Results.arterial.timeCliff, ...
                 varargin{:});      
         end
     end
@@ -81,7 +82,7 @@ classdef DispersedNumericRaichle1983 < handle & mlpet.AugmentedData & mloxygen.R
         
         function ks = buildKs(this, varargin)
             this = solve(this, varargin{:});
-            ks = [k1(this) k2(this) k3(this) k4(this) k5(this)];
+            ks = [k1(this) k2(this) k3(this) k4(this) k5(this) loss(this)];
         end
         function ho = checkSimulated(this, varargin)
             %% CHECKSIMULATED simulates tissue activity with passed and internal parameters without changing state.
@@ -105,7 +106,7 @@ classdef DispersedNumericRaichle1983 < handle & mlpet.AugmentedData & mloxygen.R
             sk = nan;
         end
         function ks_ = ks(this, varargin)
-            %% ks == [f PS lambda Delta Dt]
+            %% ks == [f PS lambda Delta Dt loss]
             %  @param 'typ' is char, understood by imagingType.
             
             ip = inputParser;
@@ -119,6 +120,7 @@ classdef DispersedNumericRaichle1983 < handle & mlpet.AugmentedData & mloxygen.R
             k(3) = k3(this.strategy_, varargin{:});
             k(4) = k4(this.strategy_, varargin{:});
             k(5) = k5(this);
+            k(6) = loss(this);
              
             roibin = logical(this.roi);
             ks_ = copy(this.roi.fourdfp);

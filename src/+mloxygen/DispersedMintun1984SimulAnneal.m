@@ -30,7 +30,9 @@ classdef DispersedMintun1984SimulAnneal < mloxygen.Mintun1984SimulAnneal
                 fprintf('\tk%i = %g\n', ky, this.ks(ky));
             end     
             fprintf('\tDt = %f\n', this.Dt); 
-            fprintf('\ttBuffer = %g\n', this.registry.tBuffer)      
+            fprintf('\ttBuffer = %g\n', this.registry.tBuffer)  
+            fprintf('\ttimeCliff = %g\n', this.timeCliff)
+            fprintf('\tloss = %g\n', this.loss())      
             
             fs = this.model.fs_Raichle_Martin;
             for ky = 1:length(fs)-1
@@ -50,7 +52,9 @@ classdef DispersedMintun1984SimulAnneal < mloxygen.Mintun1984SimulAnneal
                 s = [s sprintf('\tk%i = %g\n', ky, this.ks(ky))]; %#ok<AGROW>
             end
             s = [s sprintf('\tDt = %g\n', this.Dt)];
-            s = [s sprintf('\ttBuffer = %g\n', this.registry.tBuffer)];
+            s = [s sprintf('\ttBuffer = %g\n', this.registry.tBuffer)];            
+            s = [s sprintf('\ttimeCliff = %g\n', this.timeCliff)];
+            s = [s sprintf('\tloss = %g\n', this.loss())];
             
             fs = this.model.fs_Raichle_Martin;
             for ky = 1:length(fs)-1
