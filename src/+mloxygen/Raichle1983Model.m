@@ -49,10 +49,10 @@ classdef (Abstract) Raichle1983Model < mlpet.TracerKineticsModel
             %  lambda described in Table 2
             
             m = containers.Map;
-            m('k1') = struct('min', 0.0043, 'max',  0.0155, 'init', 0.00777, 'sigma', 3.89e-4); % f / s, max ~ 0.0155
-            m('k2') = struct('min', 0.0137, 'max',  0.0266, 'init', 0.0228,  'sigma', 0.002); % PS / s
+            m('k1') = struct('min', 0.0022, 'max',  0.0155, 'init', 0.00777, 'sigma', 3.89e-4); % f / s, max ~ 0.0155
+            m('k2') = struct('min', 0.0081, 'max',  0.0266, 'init', 0.0228,  'sigma', 0.002); % PS / s
             m('k3') = struct('min', 0.608,  'max',  1.06,   'init', 0.945,   'sigma', 0.05); % lambda in mL/mL
-            m('k4') = struct('min', 0.1,    'max',  1,      'init', 1,       'sigma', 0.1); % Delta for cerebral dispersion
+            m('k4') = struct('min', 0.1,    'max',  2,      'init', 1,       'sigma', 0.1); % Delta for cerebral dispersion
         end
         function qs   = sampled(ks, artery_interpolated, times_sampled)
             %  @param artery_interpolated is uniformly sampled at high sampling freq.
@@ -79,7 +79,6 @@ classdef (Abstract) Raichle1983Model < mlpet.TracerKineticsModel
             addParameter(ip, 'histology', '', @ischar)
             parse(ip, varargin{:})
             ipr = ip.Results;
-            
             this = this.adjustMapForHistology(ipr.histology);
         end
         function this = adjustMapForHistology(this, histology)
@@ -87,16 +86,28 @@ classdef (Abstract) Raichle1983Model < mlpet.TracerKineticsModel
             
             switch histology
                 case 'g'
-                    this.map('k2') = struct('min', 0.017,  'max', 0.0266, 'init', 0.0218,  'sigma', 0.002); % PS / s
-                    this.map('k3') = struct('min', 0.738,  'max', 1.06,   'init', 1.02,    'sigma', 0.05); % lambda in mL/mL  
-                    %this.map('k3') = struct('min', 0.987, 'max', 1.06,       'init', 1.02,    'sigma', 0.05); % lambda in mL/mL                    
+                    this.map('k1') = struct('min', 0.0043, 'max',  0.0155, 'init', 0.00777, 'sigma', 3.89e-4); % f / s, max ~ 0.0155
+                    this.map('k2') = struct('min', 0.017,  'max', 0.0266,  'init', 0.0218,  'sigma', 0.002); % PS / s
+                    this.map('k3') = struct('min', 0.738,  'max', 1.06,    'init', 1.02,    'sigma', 0.05); % lambda in mL/mL  
+                    %this.map('k3') = struct('min', 0.987, 'max', 1.06,    'init', 1.02,    'sigma', 0.05); % lambda in mL/mL                    
                 case 'w'
-                    this.map('k2') = struct('min', 0.0137, 'max', 0.0142, 'init', 0.014,   'sigma', 0.002); % PS / s
-                    this.map('k3') = struct('min', 0.608,  'max', 0.882,  'init', 0.851,   'sigma', 0.05); % lambda in mL/mL
-                    %this.map('k3') = struct('min', 0.819,  'max', 0.882,     'init', 0.851,   'sigma', 0.05); % lambda in mL/mL
-                case 's' % subcortical
-                    this.map('k2') = struct('min', 0.0159, 'max', 0.0215, 'init', 0.0187,  'sigma', 0.002); % PS / s
-                    this.map('k3') = struct('min', 0.738,  'max', 0.97,   'init', 0.924,   'sigma', 0.05); % lambda in mL/mL
+                    this.map('k1') = struct('min', 0.0043, 'max',  0.0155, 'init', 0.00777, 'sigma', 3.89e-4); % f / s, max ~ 0.0155
+                    this.map('k2') = struct('min', 0.0137, 'max', 0.0142,  'init', 0.014,   'sigma', 0.002); % PS / s
+                    this.map('k3') = struct('min', 0.608,  'max', 0.882,   'init', 0.851,   'sigma', 0.05); % lambda in mL/mL
+                    %this.map('k3') = struct('min', 0.819, 'max', 0.882,     'init', 0.851,   'sigma', 0.05); % lambda in mL/mL
+                case 's' 
+                    % subcortical
+                    this.map('k1') = struct('min', 0.0043, 'max',  0.0155, 'init', 0.00777, 'sigma', 3.89e-4); % f / s, max ~ 0.0155
+                    this.map('k2') = struct('min', 0.0159, 'max', 0.0215,  'init', 0.0187,  'sigma', 0.002); % PS / s
+                    this.map('k3') = struct('min', 0.738,  'max', 0.97,    'init', 0.924,   'sigma', 0.05); % lambda in mL/mL
+                case 'c' 
+                    % csf, indices 1, 4, 5, 43, 44
+                    this.map('k3') = struct('min', 0.1,    'max', 1,       'init', 0.5,     'sigma', 0.05); % lambda in mL/mL
+                    this.map('k4') = struct('min', 0.02,   'max', 2,       'init', 0.2,     'sigma', 0.1); % Delta for cerebral dispersion
+                case 'v' 
+                    % venous, index 6000
+                    this.map('k3') = struct('min', 0.05,   'max', 0.6,     'init', 0.1,     'sigma', 0.05); % lambda in mL/mL
+                    this.map('k4') = struct('min', 0.5,    'max', 10,      'init', 3,       'sigma', 0.1); % Delta for cerebral dispersion
                 otherwise
                     % noninformative
             end
