@@ -81,9 +81,6 @@ classdef DispersedImagingRaichle1983 < handle & matlab.mixin.Copyable
                 'artery_sampled', aif, ...
                 varargin{:});
         end
-        function Dt = DTimeToShift(varargin)
-            Dt = mloxygen.DispersedNumericRaichle1983.DTimeToShift(varargin{:});
-        end        
         function aif = extrapolateEarlyLateAif(aif__)
             aif = mloxygen.DispersedNumericRaichle1983.extrapolateEarlyLateAif(aif__);
         end
@@ -92,12 +89,12 @@ classdef DispersedImagingRaichle1983 < handle & matlab.mixin.Copyable
             %  2.  sample aif on uniform time coordinates
             %  3.  infer & apply shift of worldline, Dt, for aif
             
-            import mloxygen.DispersedImagingRaichle1983.DTimeToShift 
             import mloxygen.DispersedImagingRaichle1983.extrapolateEarlyLateAif  
             import mloxygen.DispersedImagingRaichle1983.reshapeScanner   
             import mloxygen.DispersedImagingRaichle1983.shiftWorldlines            
                         
-            [hoTimesMid,ho] = reshapeScanner(scanner); % hoTimesMid(1) ~ -5
+            hoTimesMid = reshapeScanner(scanner); % hoTimesMid(1) ~ -5
+            %[hoTimesMid,ho] = reshapeScanner(scanner); % hoTimesMid(1) ~ -5
             aifTimes = hoTimesMid(1):hoTimesMid(end); % aifTimes ~ [-5 -4 -3 ... 569]       
             hoDatetime0 = scanner.datetime0 + seconds(hoTimesMid(1)); % hoDatetime0 ~ 23-May-2019 12:04:20
             aifDatetime0 = arterial.datetime0; % aifDatetime0 ~ 23-May-2019 12:03:59
@@ -109,8 +106,8 @@ classdef DispersedImagingRaichle1983 < handle & matlab.mixin.Copyable
             aif__ = extrapolateEarlyLateAif(aif__);
             aif = makima([aifTimes__ aifTimes(end)], [aif__ 0], aifTimes); % satisfies 2.             
             
-            ho_avgt = asrow(mean(mean(mean(ho, 1), 2), 3));
-            Dt = DTimeToShift(aifTimes, aif, hoTimesMid, ho_avgt);
+            %ho_avgt = asrow(mean(mean(mean(ho, 1), 2), 3));
+            Dt = arterial.Dt;
             aif = shiftWorldlines(aif, Dt);
         end
         function [timesMid,ho] = reshapeScanner(scanner)
