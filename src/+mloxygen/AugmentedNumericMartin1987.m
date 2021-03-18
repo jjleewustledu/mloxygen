@@ -18,7 +18,7 @@ classdef AugmentedNumericMartin1987 < handle & mloxygen.DispersedNumericMartin19
             %  @param required arterial2 is an mlpet.AbstractDevice.
             %  @param roi is mlfourd.ImagingContext2.
             %  @param roi2 is mlfourd.ImagingContext2.
-            %  @param Dt_aif isscalar.
+            %  @param DtMixing isscalar.
             %  @param fracMixing in [0 1] for mixing tacs and aifs.
             %  @param T0 isscalar.
             %  @param Tf isscalar.
@@ -41,7 +41,7 @@ classdef AugmentedNumericMartin1987 < handle & mloxygen.DispersedNumericMartin19
             addParameter(ip, 'roi2', [], @(x) isa(x, 'mlfourd.ImagingContext2'))
             addParameter(ip, 'T0', 120, @isscalar)
             addParameter(ip, 'Tf', 240, @isscalar)
-            addParameter(ip, 'Dt_aif', 0, @isscalar)
+            addParameter(ip, 'DtMixing', 0, @isscalar)
             addParameter(ip, 'fracMixing', 0.5, @isscalar)
             parse(ip, devkit, devkit2, varargin{:})
             ipr = ip.Results;
@@ -61,7 +61,7 @@ classdef AugmentedNumericMartin1987 < handle & mloxygen.DispersedNumericMartin19
                 'T0', ipr.T0, ...
                 'Tf', min([ipr.Tf max(timesMid_) length(aif_)-1]), ...
                 varargin{:});
-            this.Dt_aif = ipr.Dt_aif;
+            this.DtMixing = ipr.DtMixing;
         end
     end
     

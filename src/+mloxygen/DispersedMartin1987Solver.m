@@ -21,6 +21,8 @@ classdef DispersedMartin1987Solver
         zoom = 1
         
         Dt
+        DtMixing
+        fracMixing
         registry
         timeCliff
  	end
@@ -54,6 +56,8 @@ classdef DispersedMartin1987Solver
             addParameter(ip, 'fileprefix', this.fileprefix, @ischar)
             addParameter(ip, 'Dt', [], @isnumeric)
             addParameter(ip, 'timeCliff', Inf, @isscalar)
+            addParameter(ip, 'DtMixing', [], @isnumeric)
+            addParameter(ip, 'fracMixing', [], @isnumeric)
             parse(ip, varargin{:})
             ipr = ip.Results;            
             
@@ -68,6 +72,8 @@ classdef DispersedMartin1987Solver
             this.Dt = ipr.Dt;
             this.registry = mlraichle.RaichleRegistry.instance();
             this.timeCliff = ipr.timeCliff;
+            this.DtMixing = ipr.DtMixing;
+            this.fracMixing = ipr.fracMixing;
         end
         
         function fprintfModel(this)
@@ -79,6 +85,8 @@ classdef DispersedMartin1987Solver
             fprintf('\tTf => %g\n', this.model.Tf); 
             fprintf('\tDt = %g\n', this.Dt);
             fprintf('\ttBuffer = %g\n', this.registry.tBuffer)
+            fprintf('\tDtMixing = %g\n', this.DtMixing)
+            fprintf('\tfracMixing = %g\n', this.fracMixing)
         end
         function [k,sk] = k1(this, varargin)
             [k,sk] = find_result(this, 'k1');
@@ -116,7 +124,7 @@ classdef DispersedMartin1987Solver
             if ~isempty(ipr.ylim); ylim(ipr.ylim); end
             xlabel('times / s')
             ylabel('activity / (Bq/mL)')
-            annotation('textbox', [.5 .3 .3 .3], 'String', sprintfModel(this), 'FitBoxToText', 'on', 'FontSize', 7, 'LineStyle', 'none')
+            annotation('textbox', [.5 .3 .3 .3], 'String', sprintfModel(this), 'FitBoxToText', 'on', 'FontSize', 8, 'LineStyle', 'none')
             dbs = dbstack;
             title(dbs(1).name)
         end
@@ -126,7 +134,7 @@ classdef DispersedMartin1987Solver
         function saveas(this, fn)
             save(fn, this);
         end   
-        function this = solve(this, varargin)            
+        function this = solve(this, varargin)
             [~,idx0] = max(this.Measurement > 0.1*max(this.Measurement));
             ts = this.times_sampled;
             T0 = this.model.T0 + ts(idx0);
@@ -162,6 +170,8 @@ classdef DispersedMartin1987Solver
             s = [s sprintf('\tTf => %g\n', this.model.Tf)]; 
             s = [s sprintf('\tDt = %g\n', this.Dt)];
             s = [s sprintf('\ttBuffer = %g\n', this.registry.tBuffer)];
+            s = [s sprintf('\tDtMixing = %g\n', this.DtMixing)];
+            s = [s sprintf('\tfracMixing = %g\n', this.fracMixing)];
         end 
  	end 
     

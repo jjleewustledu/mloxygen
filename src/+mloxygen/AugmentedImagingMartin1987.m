@@ -23,7 +23,7 @@ classdef AugmentedImagingMartin1987 < handle & mlpet.AugmentedData & mlpet.Trace
             %  @param solver is in {'nest' 'simulanneal' 'hmc' 'lm' 'bfgs'}, default := 'simulanneal'.
             %  @param roibin is mlfourd.ImagingContext2.
             %  @param roibin2 is mlfourd.ImagingContext2.
-            %  @param Dt_aif isscalar.
+            %  @param DtMixing isscalar.
             %  @param fracMixing in [0 1] for mixing tacs and aifs.
             %  @param T0 isscalar.
             %  @param Tf isscalar.
@@ -43,7 +43,7 @@ classdef AugmentedImagingMartin1987 < handle & mlpet.AugmentedData & mlpet.Trace
             addParameter(ip, 'roibin', [], @islogical)
             addParameter(ip, 'roibin2', [], @islogical)
             addParameter(ip, 'T', AugmentedImagingMartin1987.T, @isscalar0)
-            addParameter(ip, 'Dt_aif', 0, @isscalar)
+            addParameter(ip, 'DtMixing', 0, @isscalar)
             addParameter(ip, 'fracMixing', 0.5, @isscalar)
             addParameter(ip, 'T0', 120, @isscalar)
             addParameter(ip, 'Tf', 240, @isscalar)
@@ -62,7 +62,7 @@ classdef AugmentedImagingMartin1987 < handle & mlpet.AugmentedData & mlpet.Trace
                 'T0', 120, ...
                 'Tf', min([ipr.Tf max(timesMid_) length(aif_)-1]), ...
                 varargin{:});
-            this.Dt_aif = ipr.Dt_aif;
+            this.DtMixing = ipr.DtMixing;
         end
     end
     

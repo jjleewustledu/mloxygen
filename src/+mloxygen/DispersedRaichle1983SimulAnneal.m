@@ -8,6 +8,8 @@ classdef DispersedRaichle1983SimulAnneal < mloxygen.Raichle1983SimulAnneal
 
     properties
         Dt
+        DtMixing
+        fracMixing
         registry
     end
     
@@ -19,8 +21,14 @@ classdef DispersedRaichle1983SimulAnneal < mloxygen.Raichle1983SimulAnneal
             ip.KeepUnmatched = true;
             ip.PartialMatching = false;
             addParameter(ip, 'Dt', [], @isnumeric)
+            addParameter(ip, 'DtMixing', [], @isnumeric)
+            addParameter(ip, 'fracMixing', [], @isnumeric)
             parse(ip, varargin{:})
-            this.Dt = ip.Results.Dt;
+            ipr = ip.Results;
+            this.Dt = ipr.Dt;
+            this.DtMixing = ipr.DtMixing;
+            this.fracMixing = ipr.fracMixing;
+            this.v1 = this.model.v1;
             this.registry = mlraichle.RaichleRegistry.instance();
         end    
         
@@ -31,10 +39,13 @@ classdef DispersedRaichle1983SimulAnneal < mloxygen.Raichle1983SimulAnneal
             end 
             fprintf('\tE = 1 - exp(-PS/f) = %g\n', 1 - exp(-this.ks(2)/this.ks(1)))          
             fprintf('\tDt = %g\n', this.Dt);
+            fprintf('\tv1 = %f\n', this.v1);
             fprintf('\ttBuffer = %g\n', this.registry.tBuffer)
-            fprintf('\ttimeCliff = %g\n', this.timeCliff)
+            fprintf('\tDtMixing = %g\n', this.DtMixing)
+            fprintf('\tfracMixing = %g\n', this.fracMixing)
+            %fprintf('\ttimeCliff = %g\n', this.timeCliff)
             fprintf('\tloss = %g\n', this.loss())
-            fprintf('\tsigma0 = %g\n', this.sigma0);
+            %fprintf('\tsigma0 = %g\n', this.sigma0);
             for ky = this.map.keys
                 fprintf('\tmap(''%s'') => %s\n', ky{1}, struct2str(this.map(ky{1})));
             end
@@ -46,10 +57,13 @@ classdef DispersedRaichle1983SimulAnneal < mloxygen.Raichle1983SimulAnneal
             end
             s = [s sprintf('\tE = 1 - exp(-PS/f) = %g\n', 1 - exp(-this.ks(2)/this.ks(1)))];
             s = [s sprintf('\tDt = %g\n', this.Dt)];
-            s = [s sprintf('\ttBuffer = %g\n', this.registry.tBuffer)];
-            s = [s sprintf('\ttimeCliff = %g\n', this.timeCliff)];
+            s = [s sprintf('\tv1 = %f\n', this.v1)];
+            s = [s sprintf('\ttBuffer = %g\n', this.registry.tBuffer)];            
+            s = [s sprintf('\tDtMixing = %g\n', this.DtMixing)];
+            s = [s sprintf('\tfracMixing = %g\n', this.fracMixing)];
+            %s = [s sprintf('\ttimeCliff = %g\n', this.timeCliff)];
             s = [s sprintf('\tloss = %g\n', this.loss())];
-            s = [s sprintf('\tsigma0 = %g\n', this.sigma0)];
+            %s = [s sprintf('\tsigma0 = %g\n', this.sigma0)];
             for ky = this.map.keys
                 s = [s sprintf('\tmap(''%s'') => %s\n', ky{1}, struct2str(this.map(ky{1})))]; %#ok<AGROW>
             end

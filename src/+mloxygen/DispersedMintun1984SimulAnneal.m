@@ -8,6 +8,8 @@ classdef DispersedMintun1984SimulAnneal < mloxygen.Mintun1984SimulAnneal
  	
     properties
         Dt
+        DtMixing
+        fracMixing
         registry
     end
     
@@ -19,8 +21,13 @@ classdef DispersedMintun1984SimulAnneal < mloxygen.Mintun1984SimulAnneal
             ip.KeepUnmatched = true;
             ip.PartialMatching = false;
             addParameter(ip, 'Dt', [], @isnumeric)
+            addParameter(ip, 'DtMixing', [], @isnumeric)
+            addParameter(ip, 'fracMixing', [], @isnumeric)
             parse(ip, varargin{:})
-            this.Dt = ip.Results.Dt;
+            ipr = ip.Results;
+            this.Dt = ipr.Dt;
+            this.DtMixing = ipr.DtMixing;
+            this.fracMixing = ipr.fracMixing;
             this.registry = mlraichle.RaichleRegistry.instance();
         end
         
@@ -31,7 +38,9 @@ classdef DispersedMintun1984SimulAnneal < mloxygen.Mintun1984SimulAnneal
             end     
             fprintf('\tDt = %f\n', this.Dt); 
             fprintf('\ttBuffer = %g\n', this.registry.tBuffer)  
-            fprintf('\ttimeCliff = %g\n', this.timeCliff)
+            fprintf('\tDtMixing = %g\n', this.DtMixing)
+            fprintf('\tfracMixing = %g\n', this.fracMixing)
+            %fprintf('\ttimeCliff = %g\n', this.timeCliff)
             fprintf('\tloss = %g\n', this.loss())      
             
             fs = this.model.fs_Raichle_Martin;
@@ -41,7 +50,7 @@ classdef DispersedMintun1984SimulAnneal < mloxygen.Mintun1984SimulAnneal
             fprintf('\tE = 1 - exp(-PS/f) = %g\n', 1 - exp(-fs(2)/fs(1)));
             fprintf('\tv1 = %g\n', fs(end));
             
-            fprintf('\tsigma0 = %g\n', this.sigma0);
+            %fprintf('\tsigma0 = %g\n', this.sigma0);
             for ky = this.map.keys
                 fprintf('\tmap(''%s'') => %s\n', ky{1}, struct2str(this.map(ky{1})));
             end
@@ -53,7 +62,9 @@ classdef DispersedMintun1984SimulAnneal < mloxygen.Mintun1984SimulAnneal
             end
             s = [s sprintf('\tDt = %g\n', this.Dt)];
             s = [s sprintf('\ttBuffer = %g\n', this.registry.tBuffer)];            
-            s = [s sprintf('\ttimeCliff = %g\n', this.timeCliff)];
+            s = [s sprintf('\tDtMixing = %g\n', this.DtMixing)];
+            s = [s sprintf('\tfracMixing = %g\n', this.fracMixing)];
+            %s = [s sprintf('\ttimeCliff = %g\n', this.timeCliff)];
             s = [s sprintf('\tloss = %g\n', this.loss())];
             
             fs = this.model.fs_Raichle_Martin;
@@ -63,7 +74,7 @@ classdef DispersedMintun1984SimulAnneal < mloxygen.Mintun1984SimulAnneal
             s = [s sprintf('\tE = 1 - exp(-PS/f) = %g\n', 1 - exp(-fs(2)/fs(1)))];
             s = [s sprintf('\tv1 = %g\n', fs(end))];  
             
-            s = [s sprintf('\tsigma0 = %g\n', this.sigma0)];
+            %s = [s sprintf('\tsigma0 = %g\n', this.sigma0)];
             for ky = this.map.keys
                 s = [s sprintf('\tmap(''%s'') => %s\n', ky{1}, struct2str(this.map(ky{1})))]; %#ok<AGROW>
             end

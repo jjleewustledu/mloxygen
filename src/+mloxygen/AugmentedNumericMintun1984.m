@@ -20,7 +20,7 @@ classdef AugmentedNumericMintun1984 < handle & mloxygen.DispersedNumericMintun19
             %  @param roi is mlfourd.ImagingContext2.
             %  @param roi2 is mlfourd.ImagingContext2.
             %  @param histology in {'g' 'w' 's'}
-            %  @param Dt_aif isscalar.
+            %  @param DtMixing isscalar.
             %  @param sigma0, default from mloptimization.SimulatedAnnealing.
             %  @param fileprefix, default from devkit.
             %  @param fracMixing in [0 1] for mixing tacs and aifs.
@@ -41,7 +41,7 @@ classdef AugmentedNumericMintun1984 < handle & mloxygen.DispersedNumericMintun19
             addParameter(ip, 'arterial2', [], @(x) isa(x, 'mlpet.AbstractDevice'))            
             addParameter(ip, 'roi', [], @(x) isa(x, 'mlfourd.ImagingContext2'))
             addParameter(ip, 'roi2', [], @(x) isa(x, 'mlfourd.ImagingContext2'))
-            addParameter(ip, 'Dt_aif', 0, @isscalar)
+            addParameter(ip, 'DtMixing', 0, @isscalar)
             addParameter(ip, 'fracMixing', 0.9, @isscalar)
             parse(ip, devkit, devkit2, varargin{:})
             ipr = ip.Results;
@@ -61,7 +61,7 @@ classdef AugmentedNumericMintun1984 < handle & mloxygen.DispersedNumericMintun19
                 'fileprefix', fp, ...
                 'fs_Raichle_Martin', fs_R_M_, ...
                 varargin{:});      
-            this.Dt_aif = ipr.Dt_aif;
+            this.DtMixing = ipr.DtMixing;
         end
     end
 
