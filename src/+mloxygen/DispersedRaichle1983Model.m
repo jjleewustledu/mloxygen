@@ -8,11 +8,15 @@ classdef DispersedRaichle1983Model < mloxygen.Raichle1983Model
  	%  was created 10-Sep-2020 22:23:42 by jjlee,
  	%  last modified $LastChangedDate$ and placed into repository /Users/jjlee/MATLAB-Drive/mloxygen/src/+mloxygen.
  	%% It was developed on Matlab 9.7.0.1434023 (R2019b) Update 6 for MACI64.  Copyright 2020 John Joowon Lee.
- 	
+ 	    
+    properties
+        v1
+    end
+    
     methods (Static)
-        function loss = loss_function(ks, artery_interpolated, times_sampled, measurement, timeCliff)
+        function loss = loss_function(ks, v1, artery_interpolated, times_sampled, measurement, timeCliff)
             import mloxygen.DispersedRaichle1983Model.sampled  
-            estimation  = sampled(ks, artery_interpolated, times_sampled);
+            estimation  = sampled(ks, v1, artery_interpolated, times_sampled);
             measurement = measurement(1:length(estimation));
             positive    = measurement > 0.05*max(measurement); % & times_sampled < timeCliff;
             eoverm      = estimation(positive)./measurement(positive);
@@ -20,21 +24,21 @@ classdef DispersedRaichle1983Model < mloxygen.Raichle1983Model
             %Q           = mean((1 - eoverm).^2);
             loss        = Q; % 0.5*Q/sigma0^2 + sum(log(sigma0*measurement)); % sigma ~ sigma0*measurement
         end
-        function qs   = sampled(ks, artery_interpolated, times_sampled)
+        function qs   = sampled(ks, v1, artery_interpolated, times_sampled)
             %  @param artery_interpolated is uniformly sampled at high sampling freq.
             %  @param times_sampled are samples scheduled by the time-resolved PET reconstruction
             
             import mloxygen.DispersedRaichle1983Model.solution 
             import mlpet.TracerKineticsModel.solutionOnScannerFrames  
-            qs = solution(ks, artery_interpolated);
+            qs = solution(ks, v1, artery_interpolated);
             qs = solutionOnScannerFrames(qs, times_sampled);
         end
-        function loss = simulanneal_objective(ks, artery_interpolated, times_sampled, qs0, sigma0)
+        function loss = simulanneal_objective(ks, v1, artery_interpolated, times_sampled, qs0, sigma0)
             import mloxygen.DispersedRaichle1983Model.sampled          
-            qs = sampled(ks, artery_interpolated, times_sampled);            
+            qs = sampled(ks, v1, artery_interpolated, times_sampled);            
             loss = 0.5 * sum((1 - qs ./ qs0).^2) / sigma0^2; % + sum(log(sigma0*qs0)); % sigma ~ sigma0 * qs0
         end
-        function qs   = solution(ks, artery_interpolated)
+        function qs   = solution(ks, v1, artery_interpolated)
             %  @param artery_interpolated is uniformly sampled with at high sampling freq. starting at time = -tBuffer.
             %         First tBuffer seconds of artery_interpolated are used for modeling but not reported
             %         in returned qs.  
@@ -43,16 +47,16 @@ classdef DispersedRaichle1983Model < mloxygen.Raichle1983Model
             RR = mlraichle.RaichleRegistry.instance();
             tBuffer = RR.tBuffer;
             ALPHA = 0.005670305; % log(2)/halflife in 1/s
-            E_MIN = 0.7;
-            E_MAX = 0.93;
+            %E_MIN = 0.7;
+            %E_MAX = 0.93;
             
             f = ks(1);
             PS = ks(2);
             lambda = ks(3); 
             Delta = ks(4);
-            %E = 1 - exp(-PS/f);
-            E = max(1 - exp(-PS/f), E_MIN);
-            E = min(E, E_MAX);
+            E = 1 - exp(-PS/f);
+            %E = max(1 - exp(-PS/f), E_MIN);
+            %E = min(E, E_MAX);
             n = length(artery_interpolated);
             times = 0:1:n-1;
             timesb = times; % - tBuffer;
@@ -66,15 +70,24 @@ classdef DispersedRaichle1983Model < mloxygen.Raichle1983Model
             % use E, f, lambda
             kernel = exp(-E*f*timesb/lambda - ALPHA*timesb);
             qs = E*f*conv(kernel, artery_interpolated1);
-            qs = qs(tBuffer+1:n);
+            qs = qs(tBuffer+1:n); 
+            % + v1*artery_interpolated1(tBuffer+1:n); % but venous volume >> arterial volume
         end        
     end
 
 	methods		  
  		function this = DispersedRaichle1983Model(varargin) 
             %  @param histology is:  'g', 'w', 's', else histology information is not used.	
+            %  @param v1 is scalar.
             
             this = this@mloxygen.Raichle1983Model(varargin{:});
+            
+            ip = inputParser;
+            ip.KeepUnmatched = true;
+            addParameter(ip, 'v1', 0.038, @isnumeric)
+            parse(ip, varargin{:})
+            ipr = ip.Results;
+            this.v1 = ipr.v1;
         end        
  	end
 

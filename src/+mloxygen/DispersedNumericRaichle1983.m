@@ -40,11 +40,19 @@ classdef DispersedNumericRaichle1983 < handle & mlpet.AugmentedData & mloxygen.R
             addRequired(ip, 'devkit', @(x) isa(x, 'mlpet.IDeviceKit'))
             addParameter(ip, 'scanner', [], @(x) isa(x, 'mlpet.AbstractDevice'))
             addParameter(ip, 'arterial', [], @(x) isa(x, 'mlpet.AbstractDevice'))           
+            addParameter(ip, 'cbv', [], @(x) isa(x, 'mlfourd.ImagingContext2'))
             addParameter(ip, 'roi', [], @(x) isa(x, 'mlfourd.ImagingContext2'))
             parse(ip, devkit, varargin{:})
+            ipr = ip.Results;
             
             % mix components for augmentation       
             [tac_,timesMid_,aif_,Dt] = mixTacAif(devkit, varargin{:});
+            
+            % v1              
+
+            v1 = ipr.cbv * 0.0105;
+            v1 = v1.volumeAveraged(ipr.roi);
+            v1_ = v1.fourdfp.img;
             
             %
             
@@ -57,6 +65,7 @@ classdef DispersedNumericRaichle1983 < handle & mlpet.AugmentedData & mloxygen.R
                 'Dt', Dt, ...
                 'times_sampled', timesMid_, ...
                 'artery_interpolated', aif_, ...
+                'v1', v1_, ...
                 'fileprefix', fp, ...
                 'timeCliff', ip.Results.arterial.timeCliff, ...
                 varargin{:});      

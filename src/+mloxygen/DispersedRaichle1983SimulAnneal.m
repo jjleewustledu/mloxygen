@@ -11,6 +11,7 @@ classdef DispersedRaichle1983SimulAnneal < mloxygen.Raichle1983SimulAnneal
         DtMixing
         fracMixing
         registry
+        v1
     end
     
 	methods		  
@@ -50,6 +51,96 @@ classdef DispersedRaichle1983SimulAnneal < mloxygen.Raichle1983SimulAnneal
                 fprintf('\tmap(''%s'') => %s\n', ky{1}, struct2str(this.map(ky{1})));
             end
         end
+        function h = plot(this, varargin)
+            ip = inputParser;
+            addParameter(ip, 'showAif', true, @islogical)
+            addParameter(ip, 'xlim', [-10 500], @isnumeric)
+            addParameter(ip, 'ylim', [], @isnumeric)
+            addParameter(ip, 'zoom', 3, @isnumeric)
+            parse(ip, varargin{:})
+            ipr = ip.Results;
+            this.zoom = ipr.zoom;
+            
+            RR = mlraichle.RaichleRegistry.instance();
+            tBuffer = RR.tBuffer;
+            aif = this.dispersedAif(this.artery_interpolated);
+            h = figure;
+            times = this.times_sampled;
+            sampled = this.model.sampled(this.ks, this.v1, aif, times);
+            
+            if ipr.zoom > 1
+                leg_meas = sprintf('measurement x%i', ipr.zoom);
+            else
+                leg_meas = 'measurement';
+            end
+            if ipr.zoom > 1
+                leg_est = sprintf('estimation x%i', ipr.zoom);
+            else
+                leg_est = 'estimation';
+            end
+            if ipr.showAif
+                plot(times, ipr.zoom*this.Measurement, ':o', ...
+                    times(1:length(sampled)), ipr.zoom*sampled, '-', ...
+                    -tBuffer:length(aif)-tBuffer-1, aif, '--')
+                legend(leg_meas, leg_est, 'aif')
+            else
+                plot(times, ipr.zoom*this.Measurement, 'o', ...
+                    times(1:length(sampled)), ipr.zoom*sampled, '-')                
+                legend(leg_meas, leg_est)
+            end
+            if ~isempty(ipr.xlim); xlim(ipr.xlim); end
+            if ~isempty(ipr.ylim); ylim(ipr.ylim); end
+            xlabel('times / s')
+            ylabel('activity / (Bq/mL)')
+            annotation('textbox', [.25 .5 .3 .3], 'String', sprintfModel(this), 'FitBoxToText', 'on', 'FontSize', 8, 'LineStyle', 'none')
+            dbs = dbstack;
+            title(dbs(1).name)
+        end 
+        function this = solve(this, varargin)
+            ip = inputParser;
+            addRequired(ip, 'loss_function', @(x) isa(x, 'function_handle'))
+            parse(ip, varargin{:})
+            ipr = ip.Results;
+            
+            options_fmincon = optimoptions('fmincon', ...
+                'FunctionTolerance', 1e-12, ...
+                'OptimalityTolerance', 1e-12, ...
+                'TolCon', 1e-14, ...
+                'TolX', 1e-14);
+            if this.visualize_anneal
+                options = optimoptions('simulannealbnd', ...
+                    'AnnealingFcn', 'annealingboltz', ...
+                    'FunctionTolerance', eps, ...
+                    'HybridFcn', {@fmincon, options_fmincon}, ...
+                    'InitialTemperature', 20, ...
+                    'MaxFunEvals', 50000, ...
+                    'ReannealInterval', 200, ...
+                    'TemperatureFcn', 'temperatureexp', ...
+                    'Display', 'diagnose', ...
+                    'PlotFcns', {@saplotbestx,@saplotbestf,@saplotx,@saplotf,@saplotstopping,@saplottemperature});
+            else
+                options = optimoptions('simulannealbnd', ...
+                    'AnnealingFcn', 'annealingboltz', ...
+                    'FunctionTolerance', eps, ...
+                    'HybridFcn', {@fmincon, options_fmincon}, ...
+                    'InitialTemperature', 20, ...
+                    'MaxFunEvals', 50000, ...
+                    'ReannealInterval', 200, ...
+                    'TemperatureFcn', 'temperatureexp');
+            end
+ 			[ks_,sse,exitflag,output] = simulannealbnd( ...
+                @(ks__) ipr.loss_function( ...
+                       ks__, double(this.v1), this.artery_interpolated, this.times_sampled, double(this.Measurement), this.timeCliff), ...
+                this.ks0, this.ks_lower, this.ks_upper, options); 
+            
+            this.results_ = struct('ks0', this.ks0, 'ks', ks_, 'sse', sse, 'exitflag', exitflag, 'output', output); 
+            if ~this.quiet
+                fprintfModel(this)
+            end
+            if this.visualize
+                plot(this)
+            end
+        end 
         function s = sprintfModel(this)
             s = sprintf('Simulated Annealing:\n');
             for ky = 1:length(this.ks)
