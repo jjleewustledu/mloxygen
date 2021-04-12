@@ -106,7 +106,7 @@ classdef DispersedNumericMintun1984 < handle & mlpet.AugmentedData & mloxygen.Mi
             sk = nan;
         end
         function ks_ = ks(this, varargin)
-            %% ks == [oef metab-rate metab-amplitude Dt loss]
+            %% ks == [oef metab-rate metab-amplitude Delta Dt loss]
             
             ip = inputParser;
             ip.KeepUnmatched = true;

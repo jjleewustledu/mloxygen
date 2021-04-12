@@ -65,7 +65,7 @@ classdef DispersedMintun1984Model < mloxygen.Mintun1984Model
             estimation  = sampled(ks, fs, artery_interpolated, times_sampled);
             measurement = measurement(1:length(estimation));
             positive    = measurement > 0.05*max(measurement); % & times_sampled < timeCliff;
-            eoverm      = estimation(positive)./measurement(positive);k
+            eoverm      = estimation(positive)./measurement(positive);
             Q           = mean(abs(1 - eoverm));
             %Q           = sum((1 - eoverm).^2);
             loss        = Q; % 0.5*Q/sigma0^2 + sum(log(sigma0*measurement)); % sigma ~ sigma0*measurement
@@ -76,9 +76,8 @@ classdef DispersedMintun1984Model < mloxygen.Mintun1984Model
             
             m = containers.Map;
             m('k1') = struct('min', 0.26, 'max', 0.62, 'init', 0.44, 'sigma', 0.01); % oef +/- 3 sd
-            %m('k1') = struct('min', 0.4,  'max', 0.5,  'init', 0.44, 'sigma', 0.01); % oef +/- 3 sd
-            m('k2') = struct('min', 0.01, 'max', 0.1,  'init', 0.05, 'sigma', 0.01); % rate for sigmoidal inflow
-            m('k3') = struct('min', 1e-5, 'max', 1e-2, 'init', 1e-3, 'sigma', 0.01); % rate for exp outflow
+            m('k2') = struct('min', eps,  'max', 0.1,  'init', 0.05, 'sigma', 0.01); % rate for sigmoidal inflow
+            m('k3') = struct('min', eps,  'max', 0.02, 'init', 1e-3, 'sigma', 0.01); % rate for exp outflow
             m('k4') = struct('min', 0.01, 'max', 1,    'init', 1,    'sigma', 0.1); % Delta for cerebral dispersion
         end
         function qs   = sampled(ks, fs, artery_interpolated, times_sampled)
