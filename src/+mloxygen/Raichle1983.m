@@ -11,7 +11,7 @@ classdef Raichle1983 < handle & mlpet.TracerKineticsStrategy
     methods (Static)
         function this = createFromDeviceKit(devkit, varargin)
             sesd = devkit.sessionData;
-            sesd.jitOn222(sesd.ocOnAtlas())
+            sesd.jitOn111(sesd.ocOnAtlas())
             this = mloxygen.Raichle1983('devkit', devkit, varargin{:});
         end
     end

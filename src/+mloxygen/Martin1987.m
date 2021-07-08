@@ -25,7 +25,7 @@ classdef Martin1987 < handle & mlpet.TracerKinetics
             ipr = ip.Results;
             
             sesd = ipr.devkit.sessionData;
-            sesd.jitOn222(sesd.ocOnAtlas())
+            sesd.jitOn111(sesd.ocOnAtlas())
             this = mloxygen.Martin1987( ...
                 'devkit', ipr.devkit, 'averageVoxels', ipr.averageVoxels, 'roi', ipr.roi, 'T0', 120, 'TF', 240);
             oo = this.scanner_.activityDensity();

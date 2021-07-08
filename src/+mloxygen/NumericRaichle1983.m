@@ -35,8 +35,8 @@ classdef NumericRaichle1983 < handle & mloxygen.Raichle1983
             % prepare atlas data
             
             sesd = ipr.devkit.sessionData;
-            sesd.jitOn222(sesd.wmparc1OnAtlas())
-            sesd.jitOn222(sesd.hoOnAtlas())
+            sesd.jitOn111(sesd.wmparc1OnAtlas())
+            sesd.jitOn111(sesd.hoOnAtlas())
             
             % scanner provides calibrations, ancillary data
             

@@ -36,8 +36,8 @@ classdef DispersedNumericMintun1984_20210211 < handle & mloxygen.Mintun1984
             % prepare atlas data
             
             sesd = ipr.devkit.sessionData;
-            sesd.jitOn222(sesd.wmparc1OnAtlas())
-            sesd.jitOn222(sesd.ooOnAtlas())
+            sesd.jitOn111(sesd.wmparc1OnAtlas())
+            sesd.jitOn111(sesd.ooOnAtlas())
             
             % scanner provides calibrations, decay, ancillary data
             
