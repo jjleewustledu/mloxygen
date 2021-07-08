@@ -51,12 +51,13 @@ classdef DispersedMintun1984Model < mloxygen.Mintun1984Model
         function vecT = fs_R_M(sesd, roi)
             import mloxygen.DispersedMintun1984Model.ensureModelPrereq
             
+            blurTag = mlraichle.StudyRegistry.instance.blurTag;
             fs = sesd.fsOnAtlas('typ', 'mlfourd.ImagingContext2', ...
-                'dateonly', true, 'tags', [sesd.petPointSpreadTag sesd.regionTag]);
+                'dateonly', true, 'tags', [blurTag sesd.regionTag]);
             ensureModelPrereq(sesd, fs)
             fs_avgxyz = fs.volumeAveraged(roi);  
             cbv = sesd.cbvOnAtlas('typ', 'mlfourd.ImagingContext2', ...
-                'dateonly', true, 'tags', [sesd.petPointSpreadTag sesd.regionTag]);
+                'dateonly', true, 'tags', [blurTag sesd.regionTag]);
             ensureModelPrereq(sesd, cbv)
             v1_avgxyz = cbv.volumeAveraged(roi) * 0.0105;
             vecT = [fs_avgxyz.fourdfp.img v1_avgxyz.fourdfp.img];
