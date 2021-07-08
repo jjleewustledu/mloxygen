@@ -77,10 +77,10 @@ classdef DispersedMintun1984Model < mloxygen.Mintun1984Model
             %  metabf described in Fig. 7.
             
             m = containers.Map;
-            m('k1') = struct('min', 0.26, 'max', 0.62, 'init', 0.44, 'sigma', 0.01); % oef +/- 3 sd
-            m('k2') = struct('min', eps,  'max', 0.1,  'init', 0.05, 'sigma', 0.01); % rate for sigmoidal inflow
-            m('k3') = struct('min', eps,  'max', 0.02, 'init', 1e-3, 'sigma', 0.01); % rate for exp outflow
-            m('k4') = struct('min', 0.01, 'max', 1,    'init', 1,    'sigma', 0.1); % Delta for cerebral dispersion
+            m('k1') = struct('min', 0.26, 'max', 0.62, 'init', 0.44,  'sigma', 0.01); % oef +/- 3 sd
+            m('k2') = struct('min', eps,  'max', 1.5,  'init', 0.5,   'sigma', 0.01); % activity(HO(end))/activity(HO(90))
+            m('k3') = struct('min', 0.2,  'max', 0.8,  'init', 0.5,   'sigma', 0.1); % activity(HO)/(activity(HO) + activity(OO)) at 90 sec
+            m('k4') = struct('min', 0.25, 'max', 3,    'init', 0.835, 'sigma', 0.1); % v_post + 0.5 v_cap
         end
         function qs   = sampled(ks, fs, artery_interpolated, times_sampled)
             %  @param artery_interpolated is uniformly sampled at high sampling freq.
@@ -91,7 +91,7 @@ classdef DispersedMintun1984Model < mloxygen.Mintun1984Model
             qs = solution(ks, fs, artery_interpolated);
             qs = solutionOnScannerFrames(qs, times_sampled);
         end
-        function y = sigmoid(x)
+        function y    = sigmoid(x)
             %if x >= 0
             %    z = exp(-x);
             %    y = 1./(1 + z);
@@ -106,6 +106,94 @@ classdef DispersedMintun1984Model < mloxygen.Mintun1984Model
             loss = 0.5 * sum((1 - qs ./ qs0).^2) / sigma0^2; % + sum(log(sigma0*qs0)); % sigma ~ sigma0 * qs0
         end 
         function rho   = solution(ks, fs, artery_interpolated)
+            %  @param artery_interpolated is uniform with high sampling freq. starting at time = 0.
+
+            import mlpet.AerobicGlycolysisKit
+            import mloxygen.DispersedMintun1984Model.sigmoid
+            import mlpet.TracerKinetics
+            
+            RR = mlraichle.RaichleRegistry.instance();
+            tBuffer = RR.tBuffer;
+            ALPHA = 0.005670305; % log(2)/halflife in 1/s
+            [~,idx0] = max(artery_interpolated > 0.05*max(artery_interpolated));
+            idxU = idx0 + 90; % cf. Mintun1984
+            
+            oef = ks(1);
+            metabTail = ks(2); 
+            metabFrac = ks(3); 
+            v_post_cap = ks(4);
+            f = fs(1);
+            PS = fs(2);
+            lambda = fs(3); 
+            v1 = fs(6);
+            m = 1 - exp(-PS/f);
+            n = length(artery_interpolated);
+            times = 0:1:n-1;
+            timesb = times; % - tBuffer;
+
+            %% estimate shape of water of metabolism
+            shape = zeros(1, n);
+            shape(idx0:idxU) = linspace(0, 1, 91); % max(shape) == 1 
+            shape(idxU+1:end) = linspace(1, metabTail, n-idxU); % min(shape) == metab2
+            ductimes = zeros(1,n);
+            ductimes(idx0+1:n) = 0:(n-idx0-1);
+            ducshape = shape .* 2.^(-ductimes/122.2416); % decay-uncorrected
+            
+            %% set scale of artery_h2o
+            metabScale = metabFrac*artery_interpolated(idxU); % activity water of metab \approx activity of oxygen after 90 sec
+            metabScale = metabScale*TracerKinetics.DENSITY_PLASMA/TracerKinetics.DENSITY_BLOOD;
+            artery_h2o = metabScale*ducshape;                     
+            
+            %% compartment 2, using m, f, lambda
+            artery_o2 = artery_interpolated - artery_h2o;
+            artery_o2(artery_o2 < 0) = 0;   
+            kernel = exp(-m*f*timesb/lambda - ALPHA*timesb);
+            rho2 =  m*f*conv(kernel, artery_h2o) + ...
+                oef*m*f*conv(kernel, artery_o2);
+            
+            %% compartment 1
+            % v_post = 0.83*v1;
+            % v_cap = 0.01*v1;
+            R = 0.85; % ratio of small-vessel to large-vessel Hct
+            rho1 = v1*R*(1 - oef*v_post_cap)*artery_o2;
+            
+            rho = rho1(1:n) + rho2(1:n);        
+            rho = rho(tBuffer+1:n);
+        end        
+    end
+
+	methods		  
+ 		function this = DispersedMintun1984Model(varargin)
+ 			this = this@mloxygen.Mintun1984Model(varargin{:});
+        end        
+        function ho   = simulated(this, varargin)
+            %% SIMULATED simulates tissue activity with passed and internal parameters.
+            %  @param required ks is variational [metabf oef].
+            %  @param required fs is deterministic [f PS lambda Delta Dt].
+            %  @param aif is numeric; default is this.artery_interpolated for model state.
+        
+            ip = inputParser;
+            addRequired(ip, 'ks', @isnumeric)
+            addRequired(ip, 'fs', @isnumeric)
+            addParameter(ip, 'aif', this.artery_interpolated, @isnumeric)
+            parse(ip, varargin{:})
+            ipr = ip.Results;            
+            
+            Dt = ipr.fs(5);
+            if Dt ~= 0
+                times = 0:length(ipr.aif)-1;
+                aif = makima(times - Dt, ipr.aif, times); % remove the delay Dt found by model
+            else
+                aif = ipr.aif;
+            end
+            ho = mloxygen.DispersedMintun1984Model.sampled(ipr.ks, ipr.fs, aif, this.times_sampled);
+        end
+    end 
+    
+    %% HIDDEN
+    
+    methods (Hidden)
+        function rho   = solution_backup(ks, fs, artery_interpolated)
             %  @param artery_interpolated is uniform with high sampling freq. starting at time = 0.
 
             import mlpet.AerobicGlycolysisKit
@@ -139,8 +227,8 @@ classdef DispersedMintun1984Model < mloxygen.Mintun1984Model
             shape = zeros(1, n);
             %stimes = times0(1:n-idx0) + 1e-6;
             %shape(idx0+1:n) = stimes.^(metab2-1) .* exp(-metab3*stimes);
-            stimes1 = times(1:idxU-idx0) - times(idxU-idx0);
-            x = metab2*stimes1;
+            stimes1 = times(1:idxU-idx0) - times(idxU-idx0); % stimes1 := -90:0
+            x = metab2*stimes1; % x := -4.5:0
             shape(idx0+1:idxU) = (sigmoid(x)      - sigmoid(x(1)))/ ...
                                  (sigmoid(x(end)) - sigmoid(x(1)));
             
@@ -173,36 +261,9 @@ classdef DispersedMintun1984Model < mloxygen.Mintun1984Model
             rho = rho1(1:n) + rho2(1:n);
         
             rho = rho(tBuffer+1:n);
-        end        
+        end  
     end
-
-	methods		  
- 		function this = DispersedMintun1984Model(varargin)
- 			this = this@mloxygen.Mintun1984Model(varargin{:});
-        end        
-        function ho   = simulated(this, varargin)
-            %% SIMULATED simulates tissue activity with passed and internal parameters.
-            %  @param required ks is variational [metabf oef].
-            %  @param required fs is deterministic [f PS lambda Delta Dt].
-            %  @param aif is numeric; default is this.artery_interpolated for model state.
-        
-            ip = inputParser;
-            addRequired(ip, 'ks', @isnumeric)
-            addRequired(ip, 'fs', @isnumeric)
-            addParameter(ip, 'aif', this.artery_interpolated, @isnumeric)
-            parse(ip, varargin{:})
-            ipr = ip.Results;            
-            
-            Dt = ipr.fs(5);
-            if Dt ~= 0
-                times = 0:length(ipr.aif)-1;
-                aif = makima(times - Dt, ipr.aif, times); % remove the delay Dt found by model
-            else
-                aif = ipr.aif;
-            end
-            ho = mloxygen.DispersedMintun1984Model.sampled(ipr.ks, ipr.fs, aif, this.times_sampled);
-        end
- 	end 
+    
 
 	%  Created with Newcl by John J. Lee after newfcn by Frank Gonzalez-Morphy
  end
