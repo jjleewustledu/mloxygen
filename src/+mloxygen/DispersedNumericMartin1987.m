@@ -27,7 +27,7 @@ classdef DispersedNumericMartin1987 < handle & mlpet.AugmentedData & mloxygen.Ma
             %  @param T0 isscalar.
             %  @param Tf isscalar.
             %  @return this.
-            %  @return tac_, blurred by ipr.blurFdg.
+            %  @return tac_.
             %  @return aif_.
             
             import mloxygen.DispersedNumericMartin1987

@@ -29,7 +29,7 @@ classdef DispersedNumericRaichle1983 < handle & mlpet.AugmentedData & mloxygen.R
             %  @param sigma0, default from mloptimization.SimulatedAnnealing.
             %  @param fileprefix, default from devkit.
             %  @return this.
-            %  @return tac_, blurred by ipr.blurFdg.
+            %  @return tac_.
             %  @return aif_.
             
             import mloxygen.DispersedNumericRaichle1983

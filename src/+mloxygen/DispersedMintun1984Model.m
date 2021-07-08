@@ -9,7 +9,8 @@ classdef DispersedMintun1984Model < mloxygen.Mintun1984Model
  	%  was created 05-Dec-2020 20:46:46 by jjlee,
  	%  last modified $LastChangedDate$ and placed into repository /Users/jjlee/MATLAB-Drive/mloxygen/src/+mloxygen.
  	%% It was developed on Matlab 9.9.0.1524771 (R2020b) Update 2 for MACI64.  Copyright 2020 John Joowon Lee.
- 	
+
+    
 	methods (Static)
         function this = createFromSession(sesd, varargin)
             ip = inputParser;

@@ -29,7 +29,7 @@ classdef DispersedNumericMintun1984 < handle & mlpet.AugmentedData & mloxygen.Mi
             %  @param sigma0, default from mloptimization.SimulatedAnnealing.
             %  @param fileprefix, default from devkit.
             %  @return this.
-            %  @return tac_, blurred by ipr.blurFdg.
+            %  @return tac_.
             %  @return aif_.
             
             import mloxygen.DispersedNumericMintun1984
