@@ -6,6 +6,11 @@ classdef QuadraticNumericMintun1984 < handle & mloxygen.QuadraticNumeric
  	%  last modified $LastChangedDate$ and placed into repository /Users/jjlee/MATLAB-Drive/mloxygen/src/+mloxygen.
  	%% It was developed on Matlab 9.10.0.1669831 (R2021a) Update 2 for MACI64.  Copyright 2021 John Joowon Lee.
  	
+    properties (Constant)
+        NOMINAL_O2_CONTENT = 0.17 % mL O2.  Estimated from Ito, Eur J Nucl Med Mol Imaging (2004) 31:635-643.
+                                  % DOI 10.1007/s00259-003-1430-8
+    end
+    
     properties (Dependent)
         artery_oxygen
         artery_water_metab
@@ -41,19 +46,18 @@ classdef QuadraticNumericMintun1984 < handle & mloxygen.QuadraticNumeric
             
             fp = sprintf('mlglucose_QuadraticNumericMintun1984_createFromDeviceKit_dt%s', datestr(now, 'yyyymmddHHMMSS')); 
             
-            this = QuadraticNumericRaichle1983( ...
+            this = QuadraticNumericMintun1984( ...
                 'oo', tac_, ...
                 'devkit', devkit, ...
                 'timesMid', timesMid_, ...
                 't0', t0_, ...
-                'tObs', 40, ...
+                'tObs', 90, ...
                 'artery_interpolated', aif_, ...
                 'fileprefix', fp, ...
                 varargin{:}); 
-            this.fs_ = this.sessionData.fsOnAtlas('typ', 'ImagingContext2', 'dateonly', true);
-            this.cbf_ = mlpet.AbstractAerobicGlycolysisKit.fs2cbf(this.fs_);
-            this.vs_ = this.sessionData.vsOnAtlas('typ', 'ImagingContext2', 'dateonly', true);
-            this.cbv_ = mlpet.AbstractAerobicGlycolysisKit.vs2cbv(this.vs_);
+            sd = this.sessionData;
+            this.cbf_ = sd.cbfOnAtlas('typ', 'ImagingContext2', 'dateonly', true, 'tags', sd.regionTag);
+            this.cbv_ = sd.cbvOnAtlas('typ', 'ImagingContext2', 'dateonly', true, 'tags', sd.regionTag);
             this = metabolize(this);
         end
     end
@@ -86,11 +90,11 @@ classdef QuadraticNumericMintun1984 < handle & mloxygen.QuadraticNumeric
         %%
         
         function this = metabolize(this)
-            [~,idx0] = max(ths.artery_interpolated > 0.05*max(this.artery_interpolated));
+            [~,idx0] = max(this.artery_interpolated > 0.05*max(this.artery_interpolated));
             idxU = idx0 + 90;
             metabTail = 0.5; % activity(HO(end))/activity(HO(90))
             metabFrac = 0.5; % activity(HO)/(activity(HO) + activity(OO)) at 90 sec
-            n = length(artery_interpolated);
+            n = length(this.artery_interpolated);
             
             %% estimate shape of water of metabolism
             shape = zeros(1, n);
@@ -109,14 +113,14 @@ classdef QuadraticNumericMintun1984 < handle & mloxygen.QuadraticNumeric
             this.artery_oxygen_ = this.artery_interpolated - this.artery_water_metab_;
             this.integral_artery_oxygen_ = ...
                 0.01*this.RATIO_SMALL_LARGE_HCT*this.DENSITY_BRAIN* ...
-                trapz(this.artery_oxygen_(this.t0+1, this.tF+1));            
+                trapz(this.artery_oxygen_(this.t0+1:this.tF+1));            
         end
         function os_ = os(this, varargin)
             %% @param typ is forwarded to imagingType(), e.g., 'single', 'ImagingContext2', ...  
             %  @returns estimated f map in Hz.
             
             ip = inputParser;
-            addOptional(ip, 'typ', 'mlfourd.ImagingContext2', @ischar)
+            addParameter(ip, 'typ', 'mlfourd.ImagingContext2', @ischar)
             parse(ip, varargin{:})
             ipr = ip.Results;
             
