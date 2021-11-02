@@ -130,10 +130,10 @@ classdef (Abstract) QuadraticNumeric < handle & mlpet.TracerKinetics
             g = this.modelB12.Coefficients{2, 'Estimate'};
         end
         function g = get.b3(this)            
-            g = this.modelB34.Coefficients{3, 'Estimate'};
+            g = this.modelB34.Coefficients{1, 'Estimate'};
         end
         function g = get.b4(this)            
-            g = this.modelB34.Coefficients{4, 'Estimate'};
+            g = this.modelB34.Coefficients{2, 'Estimate'};
         end
         function g = get.alpha_decay(~)
             g = mlpet.Radionuclides.decayConstantOf('15O');
@@ -227,7 +227,7 @@ classdef (Abstract) QuadraticNumeric < handle & mlpet.TracerKinetics
     end
     
     methods (Access = protected)	
-        function mdl = buildQuadraticModel(this, obs, cbf)
+        function mdl = buildQuadraticModel(~, obs, cbf)
             %% BUILDQUADRATICMODEL 
             %  @param obs are numeric PET_{obs} := \int_{t \in \text{obs}} dt' \varrho(t').
             %  @param cbf are numeric CBF or similar flows in mL/min/hg.

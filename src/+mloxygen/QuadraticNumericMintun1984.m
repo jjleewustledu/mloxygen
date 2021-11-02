@@ -126,13 +126,19 @@ classdef QuadraticNumericMintun1984 < handle & mloxygen.QuadraticNumeric
             os_ = imagingType(ipr.typ, os_);
         end
         function this = solve(this)
-            this.modelB12 = this.buildQuadraticModel(this.artery_water_metab, this.canonical_cbf);
-            this.modelB34 = this.buildQuadraticModel(this.artery_oxygen, this.canonical_cbf);
+            obsWaterMetab = this.obsFromAif(this.artery_water_metab, this.canonical_f);
+            this.modelB12 = this.buildQuadraticModel(this.canonical_cbf, obsWaterMetab); % N.B. mapping CBF -> obs
+            
+            obsOxygen = this.obsFromAif(this.artery_oxygen, this.canonical_f);
+            this.modelB34 = this.buildQuadraticModel(this.canonical_cbf, obsOxygen); % N.B. mapping CBF -> obs
+            
             obsPet = this.obsFromTac(this.measurement);
-            poly12 = this.b1*this.cbf.^2 + this.b2*this.cbf;
-            poly34 = this.b3*this.cbf.^2 + this.b4*this.cbf;
-            numerator = obsPet - poly12 - this.integral_artery_oxygen*this.cbv;
-            denominator = poly34 - 0.835*this.integral_artery_oxygen*this.cbv;
+            cbfImg = this.cbf.fourdfp.img;
+            cbvImg = this.cbv.fourdfp.img;
+            poly12 = this.b1*cbfImg.^2 + this.b2*cbfImg;
+            poly34 = this.b3*cbfImg.^2 + this.b4*cbfImg;
+            numerator = obsPet - poly12 - this.integral_artery_oxygen*cbvImg;
+            denominator = poly34 - 0.835*this.integral_artery_oxygen*cbvImg;
             this.img_ = numerator ./ denominator;
             this.img_(isnan(this.img_)) = 0;
             this.img_(this.img_ < 0) = 0;
