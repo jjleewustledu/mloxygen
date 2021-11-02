@@ -51,7 +51,7 @@ classdef QuadraticNumericMartin1987 < handle & mloxygen.QuadraticNumeric
             %  @returns estimated v map in [0 1].
             
             ip = inputParser;
-            addOptional(ip, 'typ', 'mlfourd.ImagingContext2', @ischar)
+            addParameter(ip, 'typ', 'mlfourd.ImagingContext2', @ischar)
             parse(ip, varargin{:})
             ipr = ip.Results;
             
@@ -62,7 +62,7 @@ classdef QuadraticNumericMartin1987 < handle & mloxygen.QuadraticNumeric
         end
         function this = solve(this)
             obsPet = this.obsFromTac(this.measurement);
-            integralAif = trapz(this.artery_interpolated(this.t0+1, this.tF+1));
+            integralAif = trapz(this.artery_interpolated(this.t0+1:this.tF+1));
             this.img_ = obsPet/(this.RATIO_SMALL_LARGE_HCT*this.DENSITY_BRAIN*integralAif);
         end
     end		  
