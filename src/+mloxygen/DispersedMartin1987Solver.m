@@ -70,7 +70,7 @@ classdef DispersedMartin1987Solver
             this.sigma0 = ipr.sigma0;            
             this.fileprefix = ipr.fileprefix;
             this.Dt = ipr.Dt;
-            this.registry = mlraichle.RaichleRegistry.instance();
+            this.registry = mlraichle.StudyRegistry.instance();
             this.timeCliff = ipr.timeCliff;
             this.DtMixing = ipr.DtMixing;
             this.fracMixing = ipr.fracMixing;
@@ -101,7 +101,7 @@ classdef DispersedMartin1987Solver
             ipr = ip.Results;
             this.zoom = ipr.zoom;
             
-            RR = mlraichle.RaichleRegistry.instance();
+            RR = mlraichle.StudyRegistry.instance();
             tBuffer = RR.tBuffer;
             aif = this.artery_interpolated;
             h = figure;

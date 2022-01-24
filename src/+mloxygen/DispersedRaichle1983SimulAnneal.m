@@ -30,7 +30,7 @@ classdef DispersedRaichle1983SimulAnneal < mloxygen.Raichle1983SimulAnneal
             this.DtMixing = ipr.DtMixing;
             this.fracMixing = ipr.fracMixing;
             this.v1 = this.model.v1;
-            this.registry = mlraichle.RaichleRegistry.instance();
+            this.registry = mlraichle.StudyRegistry.instance();
         end    
         
         function fprintfModel(this)
@@ -61,7 +61,7 @@ classdef DispersedRaichle1983SimulAnneal < mloxygen.Raichle1983SimulAnneal
             ipr = ip.Results;
             this.zoom = ipr.zoom;
             
-            RR = mlraichle.RaichleRegistry.instance();
+            RR = mlraichle.StudyRegistry.instance();
             tBuffer = RR.tBuffer;
             aif = this.dispersedAif(this.artery_interpolated);
             h = figure;

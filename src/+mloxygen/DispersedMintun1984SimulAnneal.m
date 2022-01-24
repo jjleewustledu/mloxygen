@@ -28,7 +28,7 @@ classdef DispersedMintun1984SimulAnneal < mloxygen.Mintun1984SimulAnneal
             this.Dt = ipr.Dt;
             this.DtMixing = ipr.DtMixing;
             this.fracMixing = ipr.fracMixing;
-            this.registry = mlraichle.RaichleRegistry.instance();
+            this.registry = mlraichle.StudyRegistry.instance();
         end
         
         function fprintfModel(this)

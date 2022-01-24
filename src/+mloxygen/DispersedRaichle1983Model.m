@@ -44,7 +44,7 @@ classdef DispersedRaichle1983Model < mloxygen.Raichle1983Model
             %         in returned qs.  
             %  @return qs is the modeled scanner emissions, uniformly sampled.
             
-            RR = mlraichle.RaichleRegistry.instance();
+            RR = mlraichle.StudyRegistry.instance();
             tBuffer = RR.tBuffer;
             ALPHA = 0.005670305; % log(2)/halflife in 1/s
             %E_MIN = 0.7;

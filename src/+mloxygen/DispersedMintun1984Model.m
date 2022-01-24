@@ -112,7 +112,7 @@ classdef DispersedMintun1984Model < mloxygen.Mintun1984Model
             import mloxygen.DispersedMintun1984Model.sigmoid
             import mlpet.TracerKinetics
             
-            RR = mlraichle.RaichleRegistry.instance();
+            RR = mlraichle.StudyRegistry.instance();
             tBuffer = RR.tBuffer;
             ALPHA = 0.005670305; % log(2)/halflife in 1/s
             [~,idx0] = max(artery_interpolated > 0.05*max(artery_interpolated));
@@ -199,7 +199,7 @@ classdef DispersedMintun1984Model < mloxygen.Mintun1984Model
             import mlpet.AerobicGlycolysisKit
             import mloxygen.DispersedMintun1984Model.sigmoid
             
-            RR = mlraichle.RaichleRegistry.instance();
+            RR = mlraichle.StudyRegistry.instance();
             tBuffer = RR.tBuffer;
             ALPHA = 0.005670305; % log(2)/halflife in 1/s
             [~,idx0] = max(artery_interpolated > 0.05*max(artery_interpolated));
