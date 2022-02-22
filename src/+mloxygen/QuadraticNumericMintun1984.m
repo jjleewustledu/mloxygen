@@ -51,7 +51,7 @@ classdef QuadraticNumericMintun1984 < handle & mloxygen.QuadraticNumeric
                 'devkit', devkit, ...
                 'timesMid', timesMid_, ...
                 't0', t0_, ...
-                'tObs', 90, ...
+                'tObs', 40, ...
                 'artery_interpolated', aif_, ...
                 'fileprefix', fp, ...
                 varargin{:}); 
@@ -113,7 +113,7 @@ classdef QuadraticNumericMintun1984 < handle & mloxygen.QuadraticNumeric
             this.artery_oxygen_ = this.artery_interpolated - this.artery_water_metab_;
             this.integral_artery_oxygen_ = ...
                 0.01*this.RATIO_SMALL_LARGE_HCT*this.DENSITY_BRAIN* ...
-                trapz(this.artery_oxygen_(this.t0+1:this.tF+1));            
+                trapz(this.artery_oxygen_(this.t0+1:this.tF+1));
         end
         function os_ = os(this, varargin)
             %% @param typ is forwarded to imagingType(), e.g., 'single', 'ImagingContext2', ...  
@@ -130,6 +130,9 @@ classdef QuadraticNumericMintun1984 < handle & mloxygen.QuadraticNumeric
             os_ = imagingType(ipr.typ, os_);
         end
         function this = solve(this)
+            this = this.solve_on_voxels();
+        end
+        function this = solve_voxels(this)
             obsWaterMetab = this.obsFromAif(this.artery_water_metab, this.canonical_f);
             this.modelB12 = this.buildQuadraticModel(this.canonical_cbf, obsWaterMetab); % N.B. mapping CBF -> obs
             
@@ -137,16 +140,41 @@ classdef QuadraticNumericMintun1984 < handle & mloxygen.QuadraticNumeric
             this.modelB34 = this.buildQuadraticModel(this.canonical_cbf, obsOxygen); % N.B. mapping CBF -> obs
             
             obsPet = this.obsFromTac(this.measurement);
-            cbfImg = this.cbf.fourdfp.img;
-            cbvImg = this.cbv.fourdfp.img;
-            poly12 = this.b1*cbfImg.^2 + this.b2*cbfImg;
-            poly34 = this.b3*cbfImg.^2 + this.b4*cbfImg;
-            numerator = obsPet - poly12 - this.integral_artery_oxygen*cbvImg;
-            denominator = poly34 - 0.835*this.integral_artery_oxygen*cbvImg;
+            cbfb = this.cbf.blurred(this.sessionData.petPointSpread());
+            cbvb = this.cbv.blurred(this.sessionData.petPointSpread());
+            cbfimg = cbfb.fourdfp.img;
+            cbvimg = cbvb.fourdfp.img;
+            poly12 = this.b1*cbfimg.^2 + this.b2*cbfimg;
+            poly34 = this.b3*cbfimg.^2 + this.b4*cbfimg;
+            numerator = obsPet - poly12 - this.integral_artery_oxygen*cbvimg;
+            denominator = poly34 - 0.835*this.integral_artery_oxygen*cbvimg;
             this.img_ = numerator ./ denominator;
             this.img_(isnan(this.img_)) = 0;
+            this.img_(~isfinite(this.img_)) = 0;
             this.img_(this.img_ < 0) = 0;
             this.img_(this.img_ > 1) = 1;
+        end
+        function this = solve_on_wmparc1(this)
+            obsWaterMetab = this.obsFromAif(this.artery_water_metab, this.canonical_f);
+            this.modelB12 = this.buildQuadraticModel(this.canonical_cbf, obsWaterMetab); % N.B. mapping CBF -> obs
+            
+            obsOxygen = this.obsFromAif(this.artery_oxygen, this.canonical_f);
+            this.modelB34 = this.buildQuadraticModel(this.canonical_cbf, obsOxygen); % N.B. mapping CBF -> obs
+            
+            obsPet = mlfourd.ImagingContext2(this.obsFromTac(this.measurement));
+            obsPet.fileprefix = clientname(true, 2);
+            poly12 = this.cbf.^2*this.b1 + this.cbf*this.b2;
+            poly34 = this.cbf.^2*this.b3 + this.cbf*this.b4;
+
+
+            
+            wmparc1 = this.sessionData.wmparc1OnAtlas('typ', 'mlfourd.ImagingContext2');
+            this.img_ = zeros(size(wmparc1), 'single');
+
+            numerator = obsPet - poly12 - this.cbv*this.integral_artery_oxygen;
+            denominator = poly34 - this.cbv*this.integral_artery_oxygen*0.835;
+            fraction = numerator ./ denominator;
+            this.img_ = this.img_ + fraction.selectFourdfp.img;
         end
     end
     
