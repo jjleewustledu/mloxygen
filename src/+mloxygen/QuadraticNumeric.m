@@ -35,7 +35,7 @@ classdef (Abstract) QuadraticNumeric < handle & mlpet.TracerKinetics
     
     properties
         artery_interpolated
-        canonical_cbf = 10:2:100 % mL/hg/min
+        canonical_cbf = 8:2:110 % mL/hg/min
                                  % not to exceed 110 per Cook's distance from buildQuadraticModel()
         measurement
         modelA
@@ -62,11 +62,16 @@ classdef (Abstract) QuadraticNumeric < handle & mlpet.TracerKinetics
             addParameter(ip, 'roi', [], @(x) isa(x, 'mlfourd.ImagingContext2'))
             parse(ip, devkit, varargin{:})
             ipr = ip.Results;
+            if strcmp(class(ipr.scanner), class(ipr.arterial))
+                [tac__,timesMid__,t0__,aif__,Dt,datetimePeak] = ...
+                    mloxygen.QuadraticNumeric.mixTacIdif(devkit, varargin{:});
+                return
+            end
             ipr.roi = ipr.roi.binarized();
             
             % scannerDevs provide calibrations & ROI-masking    
-            blur = ipr.devkit.sessionData.petPointSpread;
-            s = ipr.scanner.blurred(blur);
+            %blur = ipr.devkit.sessionData.petPointSpread;
+            s = ipr.scanner; %.blurred(blur);
             s = s.masked(ipr.roi);
             tac = s.activityDensity();
             tac(tac < 0) = 0;                       
@@ -91,7 +96,7 @@ classdef (Abstract) QuadraticNumeric < handle & mlpet.TracerKinetics
                 case 'mlcapintec.CapracDevice'
                     t = a.times - seconds(s.datetime0 - a.datetime0);
                 otherwise
-                    error('mlpet:ValueError', ...
+                    error('mloxygen:ValueError', ...
                         'class(AugmentedData.mixTacAif.a) = %s', class(a))
             end
             
@@ -104,6 +109,51 @@ classdef (Abstract) QuadraticNumeric < handle & mlpet.TracerKinetics
             aif(aif < 0) = 0;            
             aif__ = aif;            
             Dt = a.Dt;
+        end
+        function [tac__,timesMid__,t0__,idif__,Dt,datetimePeak] = mixTacIdif(devkit, varargin)
+            %  @return taus__ are the durations of emission frames
+            %  @return t0__ is the start of the first emission frame.
+            %  @return idif__ is aligned in time to emissions.
+            %  @return Dt is the time shift needed to align aif to emissions.
+            
+            ip = inputParser;
+            ip.KeepUnmatched = true;
+            addRequired(ip, 'devkit', @(x) isa(x, 'mlpet.IDeviceKit'))
+            addParameter(ip, 'scanner', [], @(x) isa(x, 'mlpet.AbstractDevice'))
+            addParameter(ip, 'arterial', [], @(x) isa(x, 'mlpet.AbstractDevice'))
+            addParameter(ip, 'roi', [], @(x) isa(x, 'mlfourd.ImagingContext2'))
+            parse(ip, devkit, varargin{:})
+            ipr = ip.Results;
+            ipr.roi = ipr.roi.binarized();
+            
+            % scannerDevs provide calibrations & ROI-masking    
+            %blur = ipr.devkit.sessionData.petPointSpread;
+            s = ipr.scanner; %.blurred(blur);
+            s = s.masked(ipr.roi);
+            tac = s.activityDensity();
+            tac(tac < 0) = 0;                       
+            tac__ = tac;
+            taus__ = s.taus;
+            timesMid__ = s.timesMid;
+            
+            % estimate t0__
+            tac_avgxyz = squeeze(mean(mean(mean(tac__, 1), 2), 3));
+            dtac_avgxyz = diff(tac_avgxyz);
+            [~,idx] = max(dtac_avgxyz > 0.05*max(dtac_avgxyz));
+            t0__ = timesMid__(idx) - taus__(idx)/2;
+            
+            % idif
+            idif = a.activityDensity();            
+            t = a.timesMid;
+            
+            % adjust aif__, get Dt
+            idif = interp1([0 t], [0 idif], 0:s.timesMid(end), 'linear', 0);
+            idif(idif < 0) = 0;            
+            idif__ = idif; 
+
+            % trivial values
+            Dt = 0;
+            datetimePeak = NaT;
         end
     end
 
@@ -185,7 +235,8 @@ classdef (Abstract) QuadraticNumeric < handle & mlpet.TracerKinetics
             for r = 1:M
                 rho_ = ipr.f(r)*conv(ipr.aif, exp(-(ipr.f(r)/lam + alph)*times));
                 rho(r,:) = rho_(this.t0+1:this.tF+1);
-            end            
+            end
+
             obs = trapz(rho, 2); % \int dt
         end
         function obs = obsFromTac(this, varargin)
@@ -205,8 +256,7 @@ classdef (Abstract) QuadraticNumeric < handle & mlpet.TracerKinetics
             ipr = ip.Results;            
             assert(size(ipr.tac,4) == length(ipr.timesMid))
             
-            window = ipr.t0 <= ipr.timesMid & ipr.timesMid <= ipr.tF;
-            
+            window = ipr.t0 <= ipr.timesMid & ipr.timesMid <= ipr.tF;            
             obs = trapz(ipr.timesMid(window), ipr.tac(:,:,:,window), 4);
         end
     end
