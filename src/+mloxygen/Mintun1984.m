@@ -11,7 +11,7 @@ classdef Mintun1984 < handle & mlpet.TracerKineticsStrategy
     methods (Static)
         function this = createFromDeviceKit(devkit, varargin)
             sesd = devkit.sessionData;
-            sesd.jitOn111(sesd.ooOnAtlas())
+            sesd.jitOnAtlas(sesd.ooOnAtlas())
             this = mloxygen.Mintun1984('devkit', devkit, varargin{:});
         end
     end

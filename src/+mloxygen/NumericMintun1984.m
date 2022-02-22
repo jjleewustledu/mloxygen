@@ -35,8 +35,8 @@ classdef NumericMintun1984 < handle & mloxygen.Mintun1984
             % prepare atlas data
             
             sesd = ipr.devkit.sessionData;
-            sesd.jitOn111(sesd.wmparc1OnAtlas())
-            sesd.jitOn111(sesd.ooOnAtlas())
+            sesd.jitOnAtlas(sesd.wmparc1OnAtlas())
+            sesd.jitOnAtlas(sesd.ooOnAtlas())
             
             % scanner provides calibrations, ancillary data
             

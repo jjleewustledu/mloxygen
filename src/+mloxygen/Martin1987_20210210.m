@@ -9,7 +9,7 @@ classdef Martin1987_20210210 < handle & mlpet.TracerKineticsStrategy
     methods (Static)
         function this = createFromDeviceKit(devkit, varargin)
             sesd = devkit.sessionData;
-            sesd.jitOn111(sesd.ocOnAtlas())
+            sesd.jitOnAtlas(sesd.ocOnAtlas())
             this = mloxygen.Martin1987_20210210('devkit', devkit, varargin{:});
         end
     end
