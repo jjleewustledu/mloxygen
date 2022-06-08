@@ -142,10 +142,14 @@ classdef Martin1987 < handle & mlpet.TracerKinetics
             %  @param tags is char, e.g., 'wmparc1', 'wholebrain', 'voxel'
             
             ip = inputParser;
-            addParameter(ip, 'tags', ['_' this.sessionData.region], @ischar)
+            addParameter(ip, 'tags', this.sessionData.region, @istext)
             parse(ip, varargin{:})
             ipr = ip.Results;
             
+            if ~isempty(ipr.tags)
+                ipr.tags = strcat("_", strip(ipr.tags, "_"));
+            end
+
             cbv = this.roi.zeros;
             cbv = cbv.fourdfp;
             cbv.fileprefix = this.sessionData.cbvOnAtlas('typ', 'fp', 'tags', ipr.tags);            
