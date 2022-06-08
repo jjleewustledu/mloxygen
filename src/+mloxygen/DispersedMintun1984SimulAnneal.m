@@ -10,7 +10,7 @@ classdef DispersedMintun1984SimulAnneal < mloxygen.Mintun1984SimulAnneal
         Dt
         DtMixing
         fracMixing
-        registry
+        aifdata
     end
     
 	methods 		  
@@ -28,7 +28,7 @@ classdef DispersedMintun1984SimulAnneal < mloxygen.Mintun1984SimulAnneal
             this.Dt = ipr.Dt;
             this.DtMixing = ipr.DtMixing;
             this.fracMixing = ipr.fracMixing;
-            this.registry = mlraichle.StudyRegistry.instance();
+            this.aifdata = mlaif.AifData.instance();
         end
         
         function fprintfModel(this)
@@ -37,7 +37,7 @@ classdef DispersedMintun1984SimulAnneal < mloxygen.Mintun1984SimulAnneal
                 fprintf('\tk%i = %g\n', ky, this.ks(ky));
             end     
             fprintf('\tDt = %f\n', this.Dt); 
-            fprintf('\ttBuffer = %g\n', this.registry.tBuffer)  
+            fprintf('\ttBuffer = %g\n', this.aifdata.tBuffer)  
             fprintf('\tDtMixing = %g\n', this.DtMixing)
             fprintf('\tfracMixing = %g\n', this.fracMixing)
             %fprintf('\ttimeCliff = %g\n', this.timeCliff)
@@ -61,7 +61,7 @@ classdef DispersedMintun1984SimulAnneal < mloxygen.Mintun1984SimulAnneal
                 s = [s sprintf('\tk%i = %g\n', ky, this.ks(ky))]; %#ok<AGROW>
             end
             s = [s sprintf('\tDt = %g\n', this.Dt)];
-            s = [s sprintf('\ttBuffer = %g\n', this.registry.tBuffer)];            
+            s = [s sprintf('\ttBuffer = %g\n', this.aifdata.tBuffer)];            
             s = [s sprintf('\tDtMixing = %g\n', this.DtMixing)];
             s = [s sprintf('\tfracMixing = %g\n', this.fracMixing)];
             %s = [s sprintf('\ttimeCliff = %g\n', this.timeCliff)];

@@ -7,10 +7,10 @@ classdef DispersedRaichle1983SimulAnneal < mloxygen.Raichle1983SimulAnneal
  	%% It was developed on Matlab 9.7.0.1434023 (R2019b) Update 6 for MACI64.  Copyright 2020 John Joowon Lee.
 
     properties
+        aifdata
         Dt
         DtMixing
         fracMixing
-        registry
         v1
     end
     
@@ -30,7 +30,7 @@ classdef DispersedRaichle1983SimulAnneal < mloxygen.Raichle1983SimulAnneal
             this.DtMixing = ipr.DtMixing;
             this.fracMixing = ipr.fracMixing;
             this.v1 = this.model.v1;
-            this.registry = mlraichle.StudyRegistry.instance();
+            this.aifdata = mlaif.AifData.instance();
         end    
         
         function fprintfModel(this)
@@ -41,7 +41,7 @@ classdef DispersedRaichle1983SimulAnneal < mloxygen.Raichle1983SimulAnneal
             fprintf('\tE = 1 - exp(-PS/f) = %g\n', 1 - exp(-this.ks(2)/this.ks(1)))          
             fprintf('\tDt = %g\n', this.Dt);
             fprintf('\tv1 = %f\n', this.v1);
-            fprintf('\ttBuffer = %g\n', this.registry.tBuffer)
+            fprintf('\ttBuffer = %g\n', this.aifdata.tBuffer)
             fprintf('\tDtMixing = %g\n', this.DtMixing)
             fprintf('\tfracMixing = %g\n', this.fracMixing)
             %fprintf('\ttimeCliff = %g\n', this.timeCliff)
@@ -61,8 +61,7 @@ classdef DispersedRaichle1983SimulAnneal < mloxygen.Raichle1983SimulAnneal
             ipr = ip.Results;
             this.zoom = ipr.zoom;
             
-            RR = mlraichle.StudyRegistry.instance();
-            tBuffer = RR.tBuffer;
+            tBuffer = this.aifdata.tBuffer;
             aif = this.dispersedAif(this.artery_interpolated);
             h = figure;
             times = this.times_sampled;
@@ -149,7 +148,7 @@ classdef DispersedRaichle1983SimulAnneal < mloxygen.Raichle1983SimulAnneal
             s = [s sprintf('\tE = 1 - exp(-PS/f) = %g\n', 1 - exp(-this.ks(2)/this.ks(1)))];
             s = [s sprintf('\tDt = %g\n', this.Dt)];
             s = [s sprintf('\tv1 = %f\n', this.v1)];
-            s = [s sprintf('\ttBuffer = %g\n', this.registry.tBuffer)];            
+            s = [s sprintf('\ttBuffer = %g\n', this.aifdata.tBuffer)];            
             s = [s sprintf('\tDtMixing = %g\n', this.DtMixing)];
             s = [s sprintf('\tfracMixing = %g\n', this.fracMixing)];
             %s = [s sprintf('\ttimeCliff = %g\n', this.timeCliff)];

@@ -23,7 +23,7 @@ classdef DispersedMartin1987Solver
         Dt
         DtMixing
         fracMixing
-        registry
+        aifdata
         timeCliff
  	end
     
@@ -70,7 +70,7 @@ classdef DispersedMartin1987Solver
             this.sigma0 = ipr.sigma0;            
             this.fileprefix = ipr.fileprefix;
             this.Dt = ipr.Dt;
-            this.registry = mlraichle.StudyRegistry.instance();
+            this.aifdata = mlaif.AifData.instance();
             this.timeCliff = ipr.timeCliff;
             this.DtMixing = ipr.DtMixing;
             this.fracMixing = ipr.fracMixing;
@@ -84,7 +84,7 @@ classdef DispersedMartin1987Solver
             fprintf('\tT0 => %g\n', this.model.T0); 
             fprintf('\tTf => %g\n', this.model.Tf); 
             fprintf('\tDt = %g\n', this.Dt);
-            fprintf('\ttBuffer = %g\n', this.registry.tBuffer)
+            fprintf('\ttBuffer = %g\n', this.aifdata.tBuffer)
             fprintf('\tDtMixing = %g\n', this.DtMixing)
             fprintf('\tfracMixing = %g\n', this.fracMixing)
         end
@@ -101,8 +101,7 @@ classdef DispersedMartin1987Solver
             ipr = ip.Results;
             this.zoom = ipr.zoom;
             
-            RR = mlraichle.StudyRegistry.instance();
-            tBuffer = RR.tBuffer;
+            tBuffer = this.tBuffer;
             aif = this.artery_interpolated;
             h = figure;
             times = this.times_sampled;
@@ -140,7 +139,7 @@ classdef DispersedMartin1987Solver
             T0 = this.model.T0 + ts(idx0);
             Tf = min(this.model.Tf + ts(idx0), this.timeCliff);
             assert(Tf > T0)
-            tBuffer = this.registry.tBuffer;
+            tBuffer = this.aifdata.tBuffer;
             
             tsWindow = T0 <= ts & ts <= Tf;
             tac = this.Measurement(tsWindow);
@@ -169,7 +168,7 @@ classdef DispersedMartin1987Solver
             s = [s sprintf('\tT0 => %g\n', this.model.T0)]; 
             s = [s sprintf('\tTf => %g\n', this.model.Tf)]; 
             s = [s sprintf('\tDt = %g\n', this.Dt)];
-            s = [s sprintf('\ttBuffer = %g\n', this.registry.tBuffer)];
+            s = [s sprintf('\ttBuffer = %g\n', this.aifdata.tBuffer)];
             s = [s sprintf('\tDtMixing = %g\n', this.DtMixing)];
             s = [s sprintf('\tfracMixing = %g\n', this.fracMixing)];
         end 

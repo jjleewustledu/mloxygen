@@ -97,21 +97,18 @@ classdef (Abstract) FieldNumeric < handle & mlpet.TracerKinetics
         function savefig(this, varargin)
             ip = inputParser;
             addRequired(ip, 'handle', @ishandle) % fig handle
-            addParameter(ip, 'tags', '', @ischar) % for filenames
+            addParameter(ip, 'tags', '', @istext) % for filenames
             parse(ip, varargin{:})
-            ipr = ip.Results;
+            ipr = ip.Results;            
             
-            tags = ipr.tags;
-            if ~isempty(tags)
-                tags_ = ['_' strrep(tags, ' ', '_')];
-            else
-                tags_ = '';
-            end            
+            if ~isempty(ipr.tags)
+                ipr.tags = strcat("_", strip(ipr.tags, "_"));
+            end           
             dbs = dbstack;
             client = dbs(2).name;
             client_ = strrep(dbs(2).name, '.', '_');
             dtStr = datestr(this.sessionData.datetime);
-            title(sprintf('%s\n%s %s', client, tags, dtStr))
+            title(sprintf('%s\n%s %s', client, ipr.tags, dtStr))
             try
                 dtTag = lower(this.sessionData.doseAdminDatetimeTag);
                 savefig(ipr.handle, ...

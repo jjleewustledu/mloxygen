@@ -68,13 +68,15 @@ classdef (Abstract) QuadraticNumeric < handle & mlpet.TracerKinetics
                 return
             end
             ipr.roi = ipr.roi.binarized();
+            ad = mlaif.AifData.instance();
             
             % scannerDevs provide calibrations & ROI-masking    
             %blur = ipr.devkit.sessionData.petPointSpread;
             s = ipr.scanner; %.blurred(blur);
             s = s.masked(ipr.roi);
             tac = s.activityDensity();
-            tac(tac < 0) = 0;                       
+            tac(tac < 0) = 0;    
+            tac = ad.normalizationFactor*tac; % empirical normalization                   
             tac__ = tac;
             taus__ = s.taus;
             timesMid__ = s.timesMid;
@@ -88,7 +90,8 @@ classdef (Abstract) QuadraticNumeric < handle & mlpet.TracerKinetics
             
             % arterialDevs calibrate & align arterial times-series to localized scanner time-series            
             a0 = ipr.arterial;
-            [a, datetimePeak] = devkit.alignArterialToScanner(a0, s, 'sameWorldline', false);
+            [a, datetimePeak] = devkit.alignArterialToScanner( ...
+                a0, s, ipr.aifdata, 'sameWorldline', false);
             aif = a.activityDensity('Nt', Nt);
             switch class(a)
                 case 'mlswisstrace.TwiliteDevice'
@@ -301,21 +304,18 @@ classdef (Abstract) QuadraticNumeric < handle & mlpet.TracerKinetics
         function savefig(this, varargin)
             ip = inputParser;
             addRequired(ip, 'handle', @ishandle) % fig handle
-            addParameter(ip, 'tags', '', @ischar) % for filenames
+            addParameter(ip, 'tags', '', @istext) % for filenames
             parse(ip, varargin{:})
-            ipr = ip.Results;
+            ipr = ip.Results;            
             
-            tags = ipr.tags;
-            if ~isempty(tags)
-                tags_ = ['_' strrep(tags, ' ', '_')];
-            else
-                tags_ = '';
-            end            
+            if ~isempty(ipr.tags)
+                ipr.tags = strcat("_", strip(ipr.tags, "_"));
+            end          
             dbs = dbstack;
             client = dbs(2).name;
             client_ = strrep(dbs(2).name, '.', '_');
             dtStr = datestr(this.sessionData.datetime);
-            title(sprintf('%s\n%s %s', client, tags, dtStr))
+            title(sprintf('%s\n%s %s', client, ipr.tags, dtStr))
             try
                 dtTag = lower(this.sessionData.doseAdminDatetimeTag);
                 savefig(ipr.handle, ...
