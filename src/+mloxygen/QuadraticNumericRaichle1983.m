@@ -55,11 +55,24 @@ classdef QuadraticNumericRaichle1983 < handle & mloxygen.QuadraticNumeric
             parse(ip, varargin{:})
             ipr = ip.Results;
             
-            fs_ = copy(this.roi.fourdfp);
+            fs_ = copy(this.roi.imagingFormat);
             fs_.img = single(this.img_);
-            fs_.fileprefix = this.sessionData.fsOnAtlas('typ', 'fp', 'tags', [this.blurTag this.regionTag]);
+            fs_.fileprefix = this.fsOnAtlas('typ', 'fp', 'tags', [this.blurTag this.regionTag]);
             fs_ = imagingType(ipr.typ, fs_);
         end 
+        function fp = fsOnAtlas(this, varargin)
+            if isa (this.sessionData, 'mlnipet.SessionData')
+                fp = this.sessionData.fsOnAtlas('typ', 'fp', 'tags', [this.blurTag this.regionTag]);
+                return
+            end
+            if isa (this.sessionData, 'mlpipeline.ImagingMediator')
+                tags = strip([this.blurTag this.regionTag], '_');
+                ic = this.sessionData.metricOnAtlas('fs', tags);
+                fp = ic.fileprefix;
+                return
+            end
+            error('mloxygen:RuntimeError', stackstr())
+        end
         function this = solve(this, varargin)
             obsAif = this.obsFromAif(this.artery_interpolated, this.canonical_f);
             this.modelA = this.buildQuadraticModel(obsAif, this.canonical_cbf);

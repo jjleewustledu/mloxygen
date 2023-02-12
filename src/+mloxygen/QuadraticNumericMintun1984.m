@@ -55,9 +55,8 @@ classdef QuadraticNumericMintun1984 < handle & mloxygen.QuadraticNumeric
                 'artery_interpolated', aif_, ...
                 'fileprefix', fp, ...
                 varargin{:}); 
-            sd = this.sessionData;
-            this.cbf_ = sd.cbfOnAtlas('typ', 'ImagingContext2', 'dateonly', true, 'tags', sd.regionTag);
-            this.cbv_ = sd.cbvOnAtlas('typ', 'ImagingContext2', 'dateonly', true, 'tags', sd.regionTag);
+            this.cbf_ = this.cbfOnAtlas();
+            this.cbv_ = this.cbvOnAtlas();
             this = metabolize(this);
         end
     end
@@ -89,6 +88,32 @@ classdef QuadraticNumericMintun1984 < handle & mloxygen.QuadraticNumeric
         
         %%
         
+        function obj = cbfOnAtlas(this, varargin)
+            sd = this.sessionData;
+            if isa (this.sessionData, 'mlnipet.SessionData')
+                obj = this.sessionData.cbfOnAtlas('typ', 'ImagingContext2', 'dateonly', true, 'tags', sd.regionTag);
+                return
+            end
+            if isa (this.sessionData, 'mlpipeline.ImagingMediator')
+                g = glob(fullfile(this.sessionData.sessionsPath, 'ses-*', 'pet', '*_cbf_*_voxels.nii.gz'));
+                obj = mlfourd.ImagingContext2(g{1});
+                return
+            end
+            error('mloxygen:RuntimeError', stackstr())
+        end        
+        function obj = cbvOnAtlas(this, varargin)
+            sd = this.sessionData;
+            if isa (this.sessionData, 'mlnipet.SessionData')
+                obj = this.sessionData.cbvOnAtlas('typ', 'ImagingContext2', 'dateonly', true, 'tags', sd.regionTag);
+                return
+            end
+            if isa (this.sessionData, 'mlpipeline.ImagingMediator')
+                g = glob(fullfile(this.sessionData.sessionsPath, 'ses-*', 'pet', '*_cbv_*_voxels.nii.gz'));
+                obj = mlfourd.ImagingContext2(g{1});
+                return
+            end
+            error('mloxygen:RuntimeError', stackstr())
+        end
         function this = metabolize(this)
             [~,idx0] = max(this.artery_interpolated > 0.05*max(this.artery_interpolated));
             idxU = idx0 + 90;
@@ -124,35 +149,54 @@ classdef QuadraticNumericMintun1984 < handle & mloxygen.QuadraticNumeric
             parse(ip, varargin{:})
             ipr = ip.Results;
             
-            os_ = copy(this.roi.fourdfp);
+            os_ = copy(this.roi.imagingFormat);
             os_.img = single(this.img_);
-            os_.fileprefix = this.sessionData.osOnAtlas('typ', 'fp', 'tags', [this.blurTag this.regionTag]);
+            os_.fileprefix = this.osOnAtlas.fileprefix;
             os_ = imagingType(ipr.typ, os_);
+        end        
+        function obj = osOnAtlas(this, varargin)
+            if isa (this.sessionData, 'mlnipet.SessionData')
+                obj = this.sessionData.osOnAtlas('typ', 'fp', 'tags', [this.blurTag this.regionTag]);
+                return
+            end
+            if isa (this.sessionData, 'mlpipeline.ImagingMediator')
+                tags = strip([this.blurTag this.regionTag], '_');
+                obj = this.sessionData.metricOnAtlas('os', tags);
+                return
+            end
+            error('mloxygen:RuntimeError', stackstr())
         end
         function this = solve(this)
-            this = this.solve_on_voxels();
+            this = this.solve_voxels();
         end
         function this = solve_voxels(this)
-            obsWaterMetab = this.obsFromAif(this.artery_water_metab, this.canonical_f);
-            this.modelB12 = this.buildQuadraticModel(this.canonical_cbf, obsWaterMetab); % N.B. mapping CBF -> obs
+            obsWaterMetab = this.obsFromAif(this.artery_water_metab, this.canonical_f); % time series
+            this.modelB12 = this.buildQuadraticModel(this.canonical_cbf, obsWaterMetab); % N.B. nonlin model mapping CBF -> obs
             
-            obsOxygen = this.obsFromAif(this.artery_oxygen, this.canonical_f);
-            this.modelB34 = this.buildQuadraticModel(this.canonical_cbf, obsOxygen); % N.B. mapping CBF -> obs
-            
-            obsPet = this.obsFromTac(this.measurement);
-            cbfb = this.cbf.blurred(this.sessionData.petPointSpread());
-            cbvb = this.cbv.blurred(this.sessionData.petPointSpread());
-            cbfimg = cbfb.fourdfp.img;
-            cbvimg = cbvb.fourdfp.img;
-            poly12 = this.b1*cbfimg.^2 + this.b2*cbfimg;
-            poly34 = this.b3*cbfimg.^2 + this.b4*cbfimg;
-            numerator = obsPet - poly12 - this.integral_artery_oxygen*cbvimg;
-            denominator = poly34 - 0.835*this.integral_artery_oxygen*cbvimg;
-            this.img_ = numerator ./ denominator;
-            this.img_(isnan(this.img_)) = 0;
-            this.img_(~isfinite(this.img_)) = 0;
-            this.img_(this.img_ < 0) = 0;
-            this.img_(this.img_ > 1) = 1;
+            obsOxygen = this.obsFromAif(this.artery_oxygen, this.canonical_f); % time series
+            this.modelB34 = this.buildQuadraticModel(this.canonical_cbf, obsOxygen); % N.B. nonlin model mapping CBF -> obs
+
+            ps = sqrt(0.5)*this.sessionData.petPointSpread(); % for applying twice
+
+            obsPet_ifc = copy(this.roi.imagingFormat);
+            obsPet_ifc.img = this.obsFromTac(this.measurement);
+            obsPet_ic = mlfourd.ImagingContext2(obsPet_ifc);
+            obsPet_ic = obsPet_ic.blurred(ps);
+
+            cbf_ic = this.cbf.blurred(ps); % pre-blur polynomial
+            cbv_ic = this.cbv.blurred(ps); % pre-blur polynomial
+            poly12_ic = cbf_ic.^2.*this.b1 + cbf_ic.*this.b2;
+            poly34_ic = cbf_ic.^2.*this.b3 + cbf_ic.*this.b4;
+            numerator_ic = obsPet_ic - poly12_ic - cbv_ic*this.integral_artery_oxygen;
+            numerator_ic = numerator_ic.blurred(ps); % post-blur
+            denominator_ic = poly34_ic - cbv_ic*0.835*this.integral_artery_oxygen;
+            denominator_ic = denominator_ic.blurred(ps); % post-blur
+            ratio_ic = numerator_ic ./ denominator_ic;            
+            ratio_ic = ratio_ic.thresh(0);
+            ratio_ic = ratio_ic.uthresh(1);
+            ratio_ic = ratio_ic.scrubNanInf();
+
+            this.img_ = ratio_ic.imagingFormat.img;
         end
         function this = solve_on_wmparc1(this)
             obsWaterMetab = this.obsFromAif(this.artery_water_metab, this.canonical_f);

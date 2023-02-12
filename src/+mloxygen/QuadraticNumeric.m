@@ -26,9 +26,7 @@ classdef (Abstract) QuadraticNumeric < handle & mlpet.TracerKinetics
         b3
         b4
  		alpha_decay
-        blurTag
         canonical_f
-        regionTag
         roi % mlfourd.ImagingContext2
         tF
     end
@@ -91,7 +89,7 @@ classdef (Abstract) QuadraticNumeric < handle & mlpet.TracerKinetics
             % arterialDevs calibrate & align arterial times-series to localized scanner time-series            
             a0 = ipr.arterial;
             [a, datetimePeak] = devkit.alignArterialToScanner( ...
-                a0, s, ipr.aifdata, 'sameWorldline', false);
+                a0, s, 'sameWorldline', false);
             aif = a.activityDensity('Nt', Nt);
             switch class(a)
                 case 'mlswisstrace.TwiliteDevice'
@@ -104,6 +102,12 @@ classdef (Abstract) QuadraticNumeric < handle & mlpet.TracerKinetics
             end
             
             % adjust aif__, get Dt
+            if length(t) > length(aif)
+                t = t(1:length(aif));
+            end
+            if length(aif) > length(t)
+                aif = aif(1:length(t));
+            end
             if min(t) > 0
                 aif = interp1([0 t], [0 aif], 0:s.timesMid(end), 'linear', 0);
             else                
@@ -188,18 +192,13 @@ classdef (Abstract) QuadraticNumeric < handle & mlpet.TracerKinetics
         function g = get.b4(this)            
             g = this.modelB34.Coefficients{2, 'Estimate'};
         end
-        function g = get.alpha_decay(~)
-            g = mlpet.Radionuclides.decayConstantOf('15O');
-        end
-        function g = get.blurTag(~)
-            g = mlraichle.StudyRegistry.instance.blurTag;
-        end
+        function g = get.alpha_decay(this)
+            g = mlpet.Radionuclides.decayConstantOf( ...
+                this.sessionData.isotope);
+        end        
         function g = get.canonical_f(this)
             g = this.cbfToF1(this.canonical_cbf);
-        end
-        function g = get.regionTag(this)
-            g = this.sessionData.regionTag;
-        end
+        end        
         function g = get.roi(this)
             g = this.roi_;
         end    
@@ -258,9 +257,15 @@ classdef (Abstract) QuadraticNumeric < handle & mlpet.TracerKinetics
             parse(ip, varargin{:})
             ipr = ip.Results;            
             assert(size(ipr.tac,4) == length(ipr.timesMid))
-            
-            window = ipr.t0 <= ipr.timesMid & ipr.timesMid <= ipr.tF;            
-            obs = trapz(ipr.timesMid(window), ipr.tac(:,:,:,window), 4);
+
+            if size(ipr.tac,4) < 10
+                timesMore = linspace(ipr.timesMid(1), ipr.timesMid(end)); % N = 100
+                ipr.tac = this.interpolate_img(ipr.tac, ipr.timesMid, timesMore);
+            else
+                timesMore = ipr.timesMid;
+            end            
+            window = ipr.t0 <= timesMore & timesMore <= ipr.tF;            
+            obs = trapz(timesMore(window), ipr.tac(:,:,:,window), 4);
         end
     end
     
@@ -271,7 +276,7 @@ classdef (Abstract) QuadraticNumeric < handle & mlpet.TracerKinetics
         roi_
     end
     
-    methods (Static, Access = protected)        
+    methods (Static, Access = protected)
         function cbf = cbfQuadraticModel(As, obs)
             %% @return cbf in mL/hg/min.
             
@@ -295,11 +300,19 @@ classdef (Abstract) QuadraticNumeric < handle & mlpet.TracerKinetics
                 [1 1]);
             disp(mdl)
             fprintf('mdl.RMSE -> %g, min(rho) -> %g, max(rho) -> %g\n', mdl.RMSE, min(obs), max(obs));
-            if isempty(getenv('NOPLOT')) || ~isempty(getenv('DEBUG'))
+            if ~isempty(getenv('DEBUG'))
                 plotResiduals(mdl);
                 plotDiagnostics(mdl, 'cookd');
                 plotSlice(mdl);
             end
+        end
+        function img = interpolate_img(~, img, timesMid, timesMore)
+            sz = size(img);
+            tic
+            [x,y,z,t] = ndgrid(1:sz(1), 1:sz(2), 1:sz(3), timesMid);
+            [xq,yq,zq,tq] = ndgrid(1:sz(1), 1:sz(2), 1:sz(3), timesMore);
+            img = interpn(x, y, z, t, img, xq, yq, zq, tq);
+            toc
         end
         function savefig(this, varargin)
             ip = inputParser;
@@ -334,7 +347,7 @@ classdef (Abstract) QuadraticNumeric < handle & mlpet.TracerKinetics
  		function this = QuadraticNumeric(varargin)
  			%% QUADRATICNUMERIC
             %  @param devkit is mlpet.IDeviceKit.
-            %  @param sessionData is mlpipeline.ISessionData, but defers to devkit.sessionData.
+            %  @param sessionData is mlpipeline.{ISessionData,ImagingData}
             %  @param roi is understood by mlfourd.ImagingContext2; will be binarized.
 
  			this = this@mlpet.TracerKinetics(varargin{:});

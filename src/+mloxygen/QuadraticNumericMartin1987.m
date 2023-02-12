@@ -6,6 +6,10 @@ classdef QuadraticNumericMartin1987 < handle & mloxygen.QuadraticNumeric
  	%  last modified $LastChangedDate$ and placed into repository /Users/jjlee/MATLAB-Drive/mloxygen/src/+mloxygen.
  	%% It was developed on Matlab 9.10.0.1669831 (R2021a) Update 2 for MACI64.  Copyright 2021 John Joowon Lee.
  	    
+    properties (Constant)
+        T0_DELAY = 60
+    end
+
     methods (Static)
         function this = createFromDeviceKit(devkit, varargin)
             %% adjusts AIF timings for coincidence of inflow with tissue activity from scanner
@@ -37,8 +41,8 @@ classdef QuadraticNumericMartin1987 < handle & mloxygen.QuadraticNumeric
                 'oc', tac_, ...
                 'devkit', devkit, ...
                 'timesMid', timesMid_, ...
-                't0', t0_+120, ...
-                'tObs', 60, ...
+                't0', t0_ + QuadraticNumericMartin1987.T0_DELAY, ...
+                'tObs', 240, ...
                 'artery_interpolated', aif_, ...
                 'fileprefix', fp, ...
                 varargin{:});      
@@ -55,14 +59,29 @@ classdef QuadraticNumericMartin1987 < handle & mloxygen.QuadraticNumeric
             parse(ip, varargin{:})
             ipr = ip.Results;
             
-            vs_ = copy(this.roi.fourdfp);
+            vs_ = copy(this.roi.imagingFormat);
             vs_.img = single(this.img_);
-            vs_.fileprefix = this.sessionData.vsOnAtlas('typ', 'fp', 'tags', [this.blurTag this.regionTag]);
+            vs_.fileprefix = this.vsOnAtlas('typ', 'fp', 'tags', [this.blurTag this.regionTag]);
             vs_ = imagingType(ipr.typ, vs_);
         end
+        function fp = vsOnAtlas(this, varargin)
+            if isa (this.sessionData, 'mlnipet.SessionData')
+                fp = this.sessionData.vsOnAtlas('typ', 'fp', 'tags', [this.blurTag this.regionTag]);
+                return
+            end
+            if isa (this.sessionData, 'mlpipeline.ImagingMediator')
+
+                tags = strip([this.blurTag this.regionTag], '_');
+                ic = this.sessionData.metricOnAtlas('vs', tags);
+                fp = ic.fileprefix;
+                return
+            end
+            error('mloxygen:RuntimeError', stackstr())
+        end
         function this = solve(this)
-            obsPet = this.obsFromTac(this.measurement);
-            integralAif = trapz(this.artery_interpolated(this.t0+1:this.tF+1));
+            tF_brink = min(this.tF, this.timeCliff);
+            obsPet = this.obsFromTac(this.measurement, t0=this.t0, tF=tF_brink);
+            integralAif = trapz(this.artery_interpolated(this.t0+1:tF_brink+1));
             this.img_ = obsPet/(this.RATIO_SMALL_LARGE_HCT*this.DENSITY_BRAIN*integralAif);
         end
     end		  
@@ -84,7 +103,12 @@ classdef QuadraticNumericMartin1987 < handle & mloxygen.QuadraticNumeric
             ipr = ip.Results;
                         
             this.measurement = ipr.oc; 			
- 		end
+        end
+        function tcliff = timeCliff(this)
+            artery = this.artery_interpolated;
+            [~,tcliff] = max(artery < 0.01*max(artery));
+            tcliff = tcliff - 1;
+        end
  	end 
 
 	%  Created with Newcl by John J. Lee after newfcn by Frank Gonzalez-Morphy
