@@ -106,8 +106,10 @@ classdef QuadraticNumericMartin1987 < handle & mloxygen.QuadraticNumeric
         end
         function tcliff = timeCliff(this)
             artery = this.artery_interpolated;
-            [~,tcliff] = max(artery < 0.01*max(artery));
-            tcliff = tcliff - 1;
+            [~,tmax] = max(artery);
+            artery1 = artery(tmax:end);
+            [~,tcliff] = min(artery1);
+            tcliff = tmax + tcliff - 1;
         end
  	end 
 
