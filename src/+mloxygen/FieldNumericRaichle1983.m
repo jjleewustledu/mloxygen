@@ -16,7 +16,7 @@ classdef FieldNumericRaichle1983 < handle & mloxygen.FieldNumeric
             %  @return this.
             
             import mloxygen.FieldNumericRaichle1983
-            import mloxygen.FieldNumeric.mixTacAif       
+            import mlkinetics.ScannerKit.mixTacAif       
             
             ip = inputParser;
             ip.KeepUnmatched = true;

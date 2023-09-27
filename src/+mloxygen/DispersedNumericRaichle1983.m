@@ -33,7 +33,7 @@ classdef DispersedNumericRaichle1983 < handle & mlpet.AugmentedData & mloxygen.R
             %  @return aif_.
             
             import mloxygen.DispersedNumericRaichle1983
-            import mlpet.AugmentedData.mixTacAif       
+            import mlkinetics.ScannerKit.mixTacAif       
             
             ip = inputParser;
             ip.KeepUnmatched = true;

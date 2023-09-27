@@ -1,5 +1,6 @@
 classdef QuadraticNumericMintun1984 < handle & mloxygen.QuadraticNumeric
-	%% QUADRATICNUMERICMINTUN1984  
+	%% QUADRATICNUMERICMINTUN1984
+    %  N.B. assumptions made in metabolize(this, ).
 
 	%  $Revision$
  	%  was created 12-Jun-2021 21:13:11 by jjlee,
@@ -29,7 +30,7 @@ classdef QuadraticNumericMintun1984 < handle & mloxygen.QuadraticNumeric
             %  @return this.
             
             import mloxygen.QuadraticNumericMintun1984
-            import mloxygen.QuadraticNumeric.mixTacAif       
+            import mlkinetics.ScannerKit.mixTacAif       
             
             ip = inputParser;
             ip.KeepUnmatched = true;
@@ -117,24 +118,26 @@ classdef QuadraticNumericMintun1984 < handle & mloxygen.QuadraticNumeric
         function this = metabolize(this)
             [~,idx0] = max(this.artery_interpolated > 0.05*max(this.artery_interpolated));
             idxU = idx0 + 90;
-            metabTail = 0.5; % activity(HO(end))/activity(HO(90))
             metabFrac = 0.5; % activity(HO)/(activity(HO) + activity(OO)) at 90 sec
             n = length(this.artery_interpolated);
             
             %% estimate shape of water of metabolism
             shape = zeros(1, n);
-            shape(idx0:idxU) = linspace(0, 1, 91); % max(shape) == 1 
-            shape(idxU+1:end) = linspace(1, metabTail, n-idxU); % min(shape) == metab2
+            n1 = n - idx0 + 1;
+            y = (n - idx0)/(idxU - idx0);
+            shape(end-n1+1:end) = linspace(0, y, n1); % shape(idxU) == 1
             ductimes = zeros(1,n);
-            ductimes(idx0+1:n) = 0:(n-idx0-1);
-            ducshape = shape .* 2.^(-ductimes/122.2416); % decay-uncorrected
+            ductimes(idx0:end) = 0:(n1-1);
+            ducshape = shape .* 2.^(-(ductimes - idxU + 1)/122.2416); % decay-uncorrected
             
             %% set scale of artery_h2o
             metabScale = metabFrac*this.artery_interpolated(idxU); % activity water of metab \approx activity of oxygen after 90 sec
             metabScale = metabScale*this.DENSITY_PLASMA/this.DENSITY_BLOOD;
             
             %% set internal params
-            this.artery_water_metab_ = metabScale*ducshape;            
+            this.artery_water_metab_ = metabScale*ducshape;     
+            select = this.artery_water_metab_ > this.artery_interpolated;
+            this.artery_water_metab_(select) = this.artery_interpolated(select);
             this.artery_oxygen_ = this.artery_interpolated - this.artery_water_metab_;
             this.integral_artery_oxygen_ = ...
                 0.01*this.RATIO_SMALL_LARGE_HCT*this.DENSITY_BRAIN* ...

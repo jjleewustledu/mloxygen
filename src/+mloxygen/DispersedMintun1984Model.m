@@ -46,7 +46,7 @@ classdef DispersedMintun1984Model < mloxygen.Mintun1984Model
             end
             ifc_avgens.fileprefix = ic.fileprefix;
             ifc_avgens.save()
-            popd(pwd0)
+            popd(pwd0);
         end
         function vecT = fs_R_M(sesd, roi)
             import mloxygen.DispersedMintun1984Model.ensureModelPrereq
@@ -78,9 +78,9 @@ classdef DispersedMintun1984Model < mloxygen.Mintun1984Model
             
             m = containers.Map;
             m('k1') = struct('min', 0.26, 'max', 0.62, 'init', 0.44,  'sigma', 0.01); % oef +/- 3 sd
-            m('k2') = struct('min', eps,  'max', 1.5,  'init', 0.5,   'sigma', 0.01); % activity(HO(end))/activity(HO(90))
+            m('k2') = struct('min', eps,  'max', 1.5,  'init', 0.5,   'sigma', 0.01); % unused
             m('k3') = struct('min', 0.2,  'max', 0.8,  'init', 0.5,   'sigma', 0.1); % activity(HO)/(activity(HO) + activity(OO)) at 90 sec
-            m('k4') = struct('min', 0.25, 'max', 3,    'init', 0.835, 'sigma', 0.1); % v_post + 0.5 v_cap
+            m('k4') = struct('min', 0.25, 'max', 1,    'init', 0.835, 'sigma', 0.1); % v_post + 0.5 v_cap
         end
         function qs   = sampled(ks, fs, artery_interpolated, times_sampled)
             %  @param artery_interpolated is uniformly sampled at high sampling freq.
@@ -133,11 +133,12 @@ classdef DispersedMintun1984Model < mloxygen.Mintun1984Model
 
             %% estimate shape of water of metabolism
             shape = zeros(1, n);
-            shape(idx0:idxU) = linspace(0, 1, 91); % max(shape) == 1 
-            shape(idxU+1:end) = linspace(1, metabTail, n-idxU); % min(shape) == metab2
+            n1 = n - idx0 + 1;
+            y = (n - idx0)/(idxU - idx0);
+            shape(end-n1+1:end) = linspace(0, y, n1); % shape(idxU) == 1
             ductimes = zeros(1,n);
-            ductimes(idx0+1:n) = 0:(n-idx0-1);
-            ducshape = shape .* 2.^(-ductimes/122.2416); % decay-uncorrected
+            ductimes(idx0:end) = 0:(n1-1);
+            ducshape = shape .* 2.^(-(ductimes - idxU + 1)/122.2416); % decay-uncorrected
             
             %% set scale of artery_h2o
             metabScale = metabFrac*artery_interpolated(idxU); % activity water of metab \approx activity of oxygen after 90 sec

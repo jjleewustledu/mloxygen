@@ -47,120 +47,10 @@ classdef (Abstract) QuadraticNumeric < handle & mlpet.TracerKinetics
     
     methods (Static) 
         function [tac__,timesMid__,t0__,aif__,Dt,datetimePeak] = mixTacAif(devkit, varargin)
-            %  @return taus__ are the durations of emission frames
-            %  @return t0__ is the start of the first emission frame.
-            %  @return aif__ is aligned in time to emissions.
-            %  @return Dt is the time shift needed to align aif to emissions.
-            
-            ip = inputParser;
-            ip.KeepUnmatched = true;
-            addRequired(ip, 'devkit', @(x) isa(x, 'mlpet.IDeviceKit'))
-            addParameter(ip, 'scanner', [], @(x) isa(x, 'mlpet.AbstractDevice'))
-            addParameter(ip, 'arterial', [], @(x) isa(x, 'mlpet.AbstractDevice'))
-            addParameter(ip, 'roi', [], @(x) isa(x, 'mlfourd.ImagingContext2'))
-            parse(ip, devkit, varargin{:})
-            ipr = ip.Results;
-            if strcmp(class(ipr.scanner), class(ipr.arterial))
-                [tac__,timesMid__,t0__,aif__,Dt,datetimePeak] = ...
-                    mloxygen.QuadraticNumeric.mixTacIdif(devkit, varargin{:});
-                return
-            end
-            ipr.roi = ipr.roi.binarized();
-            ad = mlaif.AifData.instance();
-            
-            % scannerDevs provide calibrations & ROI-masking    
-            %blur = ipr.devkit.sessionData.petPointSpread;
-            s = ipr.scanner; %.blurred(blur);
-            s = s.masked(ipr.roi);
-            tac = s.activityDensity();
-            tac(tac < 0) = 0;    
-            tac = ad.normalizationFactor*tac; % empirical normalization                   
-            tac__ = tac;
-            taus__ = s.taus;
-            timesMid__ = s.timesMid;
-            Nt = ceil(timesMid__(end));
-            
-            % estimate t0__
-            tac_avgxyz = squeeze(mean(mean(mean(tac__, 1), 2), 3));
-            dtac_avgxyz = diff(tac_avgxyz);
-            [~,idx] = max(dtac_avgxyz > 0.05*max(dtac_avgxyz));
-            t0__ = timesMid__(idx) - taus__(idx)/2;
-            
-            % arterialDevs calibrate & align arterial times-series to localized scanner time-series            
-            a0 = ipr.arterial;
-            [a, datetimePeak] = devkit.alignArterialToScanner( ...
-                a0, s, 'sameWorldline', false);
-            aif = a.activityDensity('Nt', Nt);
-            switch class(a)
-                case 'mlswisstrace.TwiliteDevice'
-                    t = (0:Nt-1) - seconds(s.datetime0 - a.datetime0);
-                case 'mlcapintec.CapracDevice'
-                    t = a.times - seconds(s.datetime0 - a.datetime0);
-                otherwise
-                    error('mloxygen:ValueError', ...
-                        'class(AugmentedData.mixTacAif.a) = %s', class(a))
-            end
-            
-            % adjust aif__, get Dt
-            if length(t) > length(aif)
-                t = t(1:length(aif));
-            end
-            if length(aif) > length(t)
-                aif = aif(1:length(t));
-            end
-            if min(t) > 0
-                aif = interp1([0 t], [0 aif], 0:s.timesMid(end), 'linear', 0);
-            else                
-                aif = interp1(t, aif, 0:s.timesMid(end), 'linear', 0);
-            end
-            aif(aif < 0) = 0;            
-            aif__ = aif;            
-            Dt = a.Dt;
+            [tac__,timesMid__,t0__,aif__,Dt,datetimePeak] = mlkinetics.ScannerKit.mixTacAif(devkit, varargin{:});
         end
         function [tac__,timesMid__,t0__,idif__,Dt,datetimePeak] = mixTacIdif(devkit, varargin)
-            %  @return taus__ are the durations of emission frames
-            %  @return t0__ is the start of the first emission frame.
-            %  @return idif__ is aligned in time to emissions.
-            %  @return Dt is the time shift needed to align aif to emissions.
-            
-            ip = inputParser;
-            ip.KeepUnmatched = true;
-            addRequired(ip, 'devkit', @(x) isa(x, 'mlpet.IDeviceKit'))
-            addParameter(ip, 'scanner', [], @(x) isa(x, 'mlpet.AbstractDevice'))
-            addParameter(ip, 'arterial', [], @(x) isa(x, 'mlpet.AbstractDevice'))
-            addParameter(ip, 'roi', [], @(x) isa(x, 'mlfourd.ImagingContext2'))
-            parse(ip, devkit, varargin{:})
-            ipr = ip.Results;
-            ipr.roi = ipr.roi.binarized();
-            
-            % scannerDevs provide calibrations & ROI-masking    
-            %blur = ipr.devkit.sessionData.petPointSpread;
-            s = ipr.scanner; %.blurred(blur);
-            s = s.masked(ipr.roi);
-            tac = s.activityDensity();
-            tac(tac < 0) = 0;                       
-            tac__ = tac;
-            taus__ = s.taus;
-            timesMid__ = s.timesMid;
-            
-            % estimate t0__
-            tac_avgxyz = squeeze(mean(mean(mean(tac__, 1), 2), 3));
-            dtac_avgxyz = diff(tac_avgxyz);
-            [~,idx] = max(dtac_avgxyz > 0.05*max(dtac_avgxyz));
-            t0__ = timesMid__(idx) - taus__(idx)/2;
-            
-            % idif
-            idif = a.activityDensity();            
-            t = a.timesMid;
-            
-            % adjust aif__, get Dt
-            idif = interp1([0 t], [0 idif], 0:s.timesMid(end), 'linear', 0);
-            idif(idif < 0) = 0;            
-            idif__ = idif; 
-
-            % trivial values
-            Dt = 0;
-            datetimePeak = NaT;
+            [tac__,timesMid__,t0__,idif__,Dt,datetimePeak] = mlkinetics.ScannerKit.mixTacIdif(devkit, varargin{:});
         end
     end
 
@@ -278,7 +168,7 @@ classdef (Abstract) QuadraticNumeric < handle & mlpet.TracerKinetics
     
     methods (Static, Access = protected)
         function cbf = cbfQuadraticModel(As, obs)
-            %% @return cbf in mL/hg/min.
+            %% @return cbf in mL/hg/min.  See also Videen 1987.
             
             cbf = obs.^2*As(1) + obs*As(2);
         end
@@ -327,7 +217,7 @@ classdef (Abstract) QuadraticNumeric < handle & mlpet.TracerKinetics
             dbs = dbstack;
             client = dbs(2).name;
             client_ = strrep(dbs(2).name, '.', '_');
-            dtStr = datestr(this.sessionData.datetime);
+            dtStr = string(this.sessionData.datetime);
             title(sprintf('%s\n%s %s', client, ipr.tags, dtStr))
             try
                 dtTag = lower(this.sessionData.doseAdminDatetimeTag);

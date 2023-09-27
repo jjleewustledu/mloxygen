@@ -1,4 +1,4 @@
-classdef Martin1987_20210210 < handle & mlpet.TracerKineticsStrategy
+classdef Martin1987_20210210 < handle & mlpet.TracerKinetics
 	%% MARTIN1987_20210210  
 
 	%  $Revision$
@@ -55,7 +55,7 @@ classdef Martin1987_20210210 < handle & mlpet.TracerKineticsStrategy
     methods (Access = protected)
 		  
  		function this = Martin1987_20210210(varargin)
-            this = this@mlpet.TracerKineticsStrategy(varargin{:});
+            this = this@mlpet.TracerKinetics(varargin{:});
  		end
  	end 
 

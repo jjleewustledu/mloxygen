@@ -1,4 +1,4 @@
-classdef Mintun1984 < handle & mlpet.TracerKineticsStrategy
+classdef Mintun1984 < handle & mlpet.TracerKinetics
 	%% MINTUN1984 is the context to a strategy design patterns which implements:
     %  mloxygen.{Mintun1984SimulAnneal,Mintun1984LM}.
     %  For performance considerations, see also https://blogs.mathworks.com/loren/2012/03/26/considering-performance-in-object-oriented-matlab-code/
@@ -75,7 +75,7 @@ classdef Mintun1984 < handle & mlpet.TracerKineticsStrategy
 
 	methods (Access = protected)		  
  		function this = Mintun1984(varargin)
-            this = this@mlpet.TracerKineticsStrategy(varargin{:});
+            this = this@mlpet.TracerKinetics(varargin{:});
  		end
  	end 
 

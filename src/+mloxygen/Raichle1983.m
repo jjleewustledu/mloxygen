@@ -1,4 +1,4 @@
-classdef Raichle1983 < handle & mlpet.TracerKineticsStrategy
+classdef Raichle1983 < handle & mlpet.TracerKinetics
 	%% RAICHLE1983 is the context to a strategy design pattern which implements:
     %  mloxygen.{Raichle1983Nest, Raichle1983SimulAnneal, Raichle1983LM}.
     %  For performance considerations, see also https://blogs.mathworks.com/loren/2012/03/26/considering-performance-in-object-oriented-matlab-code/
@@ -69,7 +69,7 @@ classdef Raichle1983 < handle & mlpet.TracerKineticsStrategy
 
 	methods (Access = protected)		  
  		function this = Raichle1983(varargin)
-            this = this@mlpet.TracerKineticsStrategy(varargin{:});
+            this = this@mlpet.TracerKinetics(varargin{:});
         end
  	end 
 

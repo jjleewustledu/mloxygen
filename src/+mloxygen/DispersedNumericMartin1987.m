@@ -31,7 +31,7 @@ classdef DispersedNumericMartin1987 < handle & mlpet.AugmentedData & mloxygen.Ma
             %  @return aif_.
             
             import mloxygen.DispersedNumericMartin1987
-            import mloxygen.DispersedNumericMartin1987.mixTacAif
+            import mlkinetics.ScannerKit.mixTacAif
             
             ip = inputParser;
             ip.KeepUnmatched = true;
@@ -79,35 +79,6 @@ classdef DispersedNumericMartin1987 < handle & mlpet.AugmentedData & mloxygen.Ma
         
         %%
         
-        function a = artery_global(this, varargin)
-            %% ARTERY_GLOBAL
-            %  @required roi is understood by mlfourd.ImagingContext2.
-            %  @param typ is understood by imagingType.
-            %  @return a is an imagingType.
-            
-            ip = inputParser;
-            ip.KeepUnmatched = true;
-            addRequired(ip, 'roi')
-            addParameter(ip, 'typ', 'mlfourd.ImagingContext2', @ischar)
-            parse(ip, varargin{:})
-            ipr = ip.Results;
-            ipr.roi = mlfourd.ImagingContext2(ipr.roi);
-            ipr.roi = ipr.roi.binarized();
-            
-            artery_interpolated1 = this.artery_interpolated(this.tBuffer+1:end);
-            avec = this.model.solutionOnScannerFrames(artery_interpolated1, this.times_sampled);
-            
-            roibin = logical(ipr.roi);
-            a = copy(ipr.roi.fourdfp);
-            a.img = zeros([size(ipr.roi) length(avec)]);
-            for t = 1:length(avec)
-                img = zeros(size(ipr.roi), 'single');
-                img(roibin) = avec(t);
-                a.img(:,:,:,t) = img;
-            end
-            a.fileprefix = this.sessionData.aifsOnAtlas('typ', 'fp', 'tags', [this.blurTag this.regionTag]);
-            a = imagingType(ipr.typ, a);
-        end
 		function a = artery_local(this, varargin)
             %% ARTERY_LOCAL
             %  @param typ is understood by imagingType.
@@ -215,5 +186,5 @@ classdef DispersedNumericMartin1987 < handle & mlpet.AugmentedData & mloxygen.Ma
  	end 
 
 	%  Created with Newcl by John J. Lee after newfcn by Frank Gonzalez-Morphy
- end
+end
 

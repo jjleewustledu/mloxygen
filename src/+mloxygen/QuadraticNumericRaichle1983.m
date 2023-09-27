@@ -16,7 +16,7 @@ classdef QuadraticNumericRaichle1983 < handle & mloxygen.QuadraticNumeric
             %  @return this.
             
             import mloxygen.QuadraticNumericRaichle1983
-            import mloxygen.QuadraticNumeric.mixTacAif       
+            import mlkinetics.ScannerKit.mixTacAif       
             
             ip = inputParser;
             ip.KeepUnmatched = true;

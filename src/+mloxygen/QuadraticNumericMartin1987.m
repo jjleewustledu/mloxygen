@@ -20,7 +20,7 @@ classdef QuadraticNumericMartin1987 < handle & mloxygen.QuadraticNumeric
             %  @return this.
             
             import mloxygen.QuadraticNumericMartin1987
-            import mloxygen.QuadraticNumeric.mixTacAif       
+            import mlkinetics.ScannerKit.mixTacAif       
             
             ip = inputParser;
             ip.KeepUnmatched = true;
@@ -50,6 +50,21 @@ classdef QuadraticNumericMartin1987 < handle & mloxygen.QuadraticNumeric
     end
 
 	methods 
+ 		function this = QuadraticNumericMartin1987(varargin)
+ 			%% QUADRATICNUMERICMARTIN1987
+ 			%  @param .
+
+ 			this = this@mloxygen.QuadraticNumeric(varargin{:});
+            
+            ip = inputParser;
+            ip.KeepUnmatched = true;
+            ip.PartialMatching = false;
+            addParameter(ip, 'oc', [], @(x) isnumeric(x))
+            parse(ip, varargin{:})
+            ipr = ip.Results;
+                        
+            this.measurement = ipr.oc; 			
+        end
         function vs_ = vs(this, varargin)
             %% @param typ is forwarded to imagingType(), e.g., 'single', 'ImagingContext2', ...  
             %  @returns estimated v map in [0 1].
@@ -89,21 +104,6 @@ classdef QuadraticNumericMartin1987 < handle & mloxygen.QuadraticNumeric
     %% PROTECTED
     
 	methods (Access = protected)
- 		function this = QuadraticNumericMartin1987(varargin)
- 			%% QUADRATICNUMERICMARTIN1987
- 			%  @param .
-
- 			this = this@mloxygen.QuadraticNumeric(varargin{:});
-            
-            ip = inputParser;
-            ip.KeepUnmatched = true;
-            ip.PartialMatching = false;
-            addParameter(ip, 'oc', [], @(x) isnumeric(x))
-            parse(ip, varargin{:})
-            ipr = ip.Results;
-                        
-            this.measurement = ipr.oc; 			
-        end
         function tcliff = timeCliff(this)
             artery = this.artery_interpolated;
             [~,tmax] = max(artery);
