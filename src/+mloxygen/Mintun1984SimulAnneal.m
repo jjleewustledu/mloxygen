@@ -141,7 +141,7 @@ classdef Mintun1984SimulAnneal < mlpet.TracerSimulAnneal & mloxygen.Mintun1984St
                        ks__, double(this.model.fs_Raichle_Martin), this.artery_interpolated, this.times_sampled, double(this.Measurement), this.timeCliff), ...
                 this.ks0, this.ks_lower, this.ks_upper, options); 
             
-            this.results_ = struct('ks0', this.ks0, 'ks', ks_, 'sse', sse, 'exitflag', exitflag, 'output', output); 
+            this.product_ = struct('ks0', this.ks0, 'ks', ks_, 'sse', sse, 'exitflag', exitflag, 'output', output); 
             if ~this.quiet
                 fprintfModel(this)
             end
