@@ -62,7 +62,7 @@ classdef DispersedRaichle1983SimulAnneal < mloxygen.Raichle1983SimulAnneal
             this.zoom = ipr.zoom;
             
             tBuffer = this.aifdata.tBuffer;
-            aif = this.dispersedAif(this.artery_interpolated);
+            aif = this.dispersedAif(this.artery_interpolated, this.ks(end));
             h = figure;
             times = this.times_sampled;
             sampled = this.model.sampled(this.ks, this.v1, aif, times);
