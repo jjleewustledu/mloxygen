@@ -1,5 +1,6 @@
-classdef Raichle1983SimulAnneal < mlpet.TracerSimulAnneal & mloxygen.Raichle1983Strategy
+classdef Raichle1983SimulAnneal < mlpet.TCSimulAnneal
 	%% RAICHLE1983SIMULANNEAL operates on single voxels/regions.
+    %  It overloads fprintfModel(), solve() for higher accuracies, sprintfModel().
 
 	%  $Revision$
  	%  was created 10-Sep-2020 19:43:31 by jjlee,
@@ -7,7 +8,6 @@ classdef Raichle1983SimulAnneal < mlpet.TracerSimulAnneal & mloxygen.Raichle1983
  	%% It was developed on Matlab 9.7.0.1434023 (R2019b) Update 6 for MACI64.  Copyright 2020 John Joowon Lee.
 
     properties
-        timeCliff
     end
     
 	methods
@@ -17,16 +17,7 @@ classdef Raichle1983SimulAnneal < mlpet.TracerSimulAnneal & mloxygen.Raichle1983
             %  @param sigma0.
             %  @param fileprefix.
 
- 			this = this@mlpet.TracerSimulAnneal(varargin{:});
-            
-            ip = inputParser;
-            ip.KeepUnmatched = true;
-            addParameter(ip, 'timeCliff', Inf, @isscalar)
-            parse(ip, varargin{:})
-            this.timeCliff = ip.Results.timeCliff;
-            
-            [this.ks_lower,this.ks_upper,this.ks0] = remapper(this);
-            this.artery_interpolated = this.model.artery_interpolated;
+ 			this = this@mlpet.TCSimulAnneal(varargin{:});
         end        
         
         function fprintfModel(this)
@@ -34,24 +25,14 @@ classdef Raichle1983SimulAnneal < mlpet.TracerSimulAnneal & mloxygen.Raichle1983
             for ky = 1:length(this.ks)
                 fprintf('\tk%i = %f\n', ky, this.ks(ky));
             end           
-            fprintf('\tE = 1 - exp(-PS/f) = %f\n', 1 - exp(-this.ks(2)/this.ks(1)))
+            PS = this.ks(3);
+            f = this.ks(1);
+            fprintf('\tE = 1 - exp(-PS/f) = %f\n', this.context.E(PS, f))
             fprintf('\tsigma0 = %f\n', this.sigma0);
             for ky = this.map.keys
                 fprintf('\tmap(''%s'') => %s\n', ky{1}, struct2str(this.map(ky{1})));
             end
         end
-        function [k,sk] = k1(this, varargin)
-            [k,sk] = find_result(this, 'k1');
-        end
-        function [k,sk] = k2(this, varargin)
-            [k,sk] = find_result(this, 'k2');
-        end
-        function [k,sk] = k3(this, varargin)
-            [k,sk] = find_result(this, 'k3');
-        end 
-        function [k,sk] = k4(this, varargin)
-            [k,sk] = find_result(this, 'k4');
-        end 
         function this = solve(this, varargin)
             ip = inputParser;
             addRequired(ip, 'loss_function', @(x) isa(x, 'function_handle'))
@@ -86,8 +67,8 @@ classdef Raichle1983SimulAnneal < mlpet.TracerSimulAnneal & mloxygen.Raichle1983
             end
  			[ks_,sse,exitflag,output] = simulannealbnd( ...
                 @(ks__) ipr.loss_function( ...
-                       ks__, this.artery_interpolated, this.times_sampled, double(this.Measurement), this.timeCliff), ...
-                this.ks0, this.ks_lower, this.ks_upper, options); 
+                        ks__, this.Data, this.ArteryInterpolated, this.TimesSampled, double(this.Measurement)), ...
+                        this.ks0, this.ks_lower, this.ks_upper, options);
             
             this.product_ = struct('ks0', this.ks0, 'ks', ks_, 'sse', sse, 'exitflag', exitflag, 'output', output); 
             if ~this.quiet
@@ -102,7 +83,9 @@ classdef Raichle1983SimulAnneal < mlpet.TracerSimulAnneal & mloxygen.Raichle1983
             for ky = 1:length(this.ks)
                 s = [s sprintf('\tk%i = %f\n', ky, this.ks(ky))]; %#ok<AGROW>
             end
-            s = [s sprintf('\tE = 1 - exp(-PS/f) = %f\n', 1 - exp(-this.ks(2)/this.ks(1)))];
+            PS = this.ks(3);
+            f = this.ks(1);
+            s = [s sprintf('\tE = 1 - exp(-PS/f) = %f\n', this.context.E(PS, f))];
             s = [s sprintf('\tsigma0 = %f\n', this.sigma0)];
             for ky = this.map.keys
                 s = [s sprintf('\tmap(''%s'') => %s\n', ky{1}, struct2str(this.map(ky{1})))]; %#ok<AGROW>

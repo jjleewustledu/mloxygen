@@ -1,5 +1,6 @@
-classdef Mintun1984SimulAnneal < mlpet.TracerSimulAnneal & mloxygen.Mintun1984Strategy
+classdef Mintun1984SimulAnneal < mlpet.TCSimulAnneal
 	%% MINTUN1984SIMULANNEAL operates on single voxels/regions. 
+    %  It overloads fprintfModel(), solve() for higher accuracies, sprintfModel().
 
 	%  $Revision$
  	%  was created 07-Dec-2020 23:22:23 by jjlee,
@@ -7,7 +8,6 @@ classdef Mintun1984SimulAnneal < mlpet.TracerSimulAnneal & mloxygen.Mintun1984St
  	%% It was developed on Matlab 9.9.0.1524771 (R2020b) Update 2 for MACI64.  Copyright 2020 John Joowon Lee.
  	
     properties
-        timeCliff
     end
     
 	methods		  
@@ -17,16 +17,7 @@ classdef Mintun1984SimulAnneal < mlpet.TracerSimulAnneal & mloxygen.Mintun1984St
             %  @param sigma0.
             %  @param fileprefix.
  			
- 			this = this@mlpet.TracerSimulAnneal(varargin{:});
-            
-            ip = inputParser;
-            ip.KeepUnmatched = true;
-            addParameter(ip, 'timeCliff', Inf, @isscalar)
-            parse(ip, varargin{:})
-            this.timeCliff = ip.Results.timeCliff;
-            
-            [this.ks_lower,this.ks_upper,this.ks0] = remapper(this);
-            this.artery_interpolated = this.model.artery_interpolated;
+ 			this = this@mlpet.TCSimulAnneal(varargin{:});
         end                
         
         function fprintfModel(this)
@@ -35,75 +26,17 @@ classdef Mintun1984SimulAnneal < mlpet.TracerSimulAnneal & mloxygen.Mintun1984St
                 fprintf('\tk%i = %f\n', ky, this.ks(ky));
             end            
             
-            fs = this.model.fs_Raichle_Martin;
-            for ky = 1:length(fs)-1
-                fprintf('\tfs(%i) = %f\n', ky, fs(ky));
+            ks = this.Data.raichle_ks;
+            for ky = 1:length(ks)-1
+                fprintf('\tfs(%i) = %f\n', ky, ks(ky));
             end
-            fprintf('\tv1 = %f\n', fs(end));
-            fprintf('\tE = 1 - exp(-PS/f) = %f\n', 1 - exp(-fs(2)/fs(1)));
+            fprintf('\tE = 1 - exp(-PS/f) = %f\n', 1 - exp(-ks(2)/ks(1)));
             
             fprintf('\tsigma0 = %f\n', this.sigma0);
             for ky = this.map.keys
                 fprintf('\tmap(''%s'') => %s\n', ky{1}, struct2str(this.map(ky{1})));
             end
         end
-        function [k,sk] = k1(this, varargin)
-            [k,sk] = find_result(this, 'k1');
-        end
-        function [k,sk] = k2(this, varargin)
-            [k,sk] = find_result(this, 'k2');
-        end
-        function [k,sk] = k3(this, varargin)
-            [k,sk] = find_result(this, 'k3');
-        end 
-        function [k,sk] = k4(this, varargin)
-            [k,sk] = find_result(this, 'k4');
-        end        
-        function h = plot(this, varargin)
-            ip = inputParser;
-            addParameter(ip, 'showAif', true, @islogical)
-            addParameter(ip, 'xlim', [-10 500], @isnumeric)            
-            addParameter(ip, 'ylim', [], @isnumeric)
-            addParameter(ip, 'zoom', 4, @isnumeric)
-            parse(ip, varargin{:})
-            ipr = ip.Results;
-            this.zoom = ipr.zoom;            
-            
-            ad = mlaif.AifData.instance();
-            tBuffer = ad.tBuffer;
-            aif = this.dispersedAif(this.artery_interpolated);
-            h = figure;
-            times = this.times_sampled;
-            sampled = this.model.sampled(this.ks, this.model.fs_Raichle_Martin, aif, times);            
-            
-            if ipr.zoom > 1
-                leg_meas = sprintf('measurement x%i', ipr.zoom);
-            else
-                leg_meas = 'measurement';
-            end
-            if ipr.zoom > 1
-                leg_est = sprintf('estimation x%i', ipr.zoom);
-            else
-                leg_est = 'estimation';
-            end
-            if ipr.showAif
-                plot(times, ipr.zoom*this.Measurement, ':o', ...
-                    times(1:length(sampled)), ipr.zoom*sampled, '-', ...
-                    -tBuffer:length(aif)-tBuffer-1, aif, '--') 
-                legend(leg_meas, leg_est, 'aif')
-            else
-                plot(times, ipr.zoom*this.Measurement, 'o', ...
-                    times(1:length(sampled)), ipr.zoom*sampled, '-')                
-                legend(leg_meas, leg_est)
-            end
-            if ~isempty(ipr.xlim); xlim(ipr.xlim); end
-            if ~isempty(ipr.ylim); ylim(ipr.ylim); end
-            xlabel('times / s')
-            ylabel('activity / (Bq/mL)')
-            annotation('textbox', [.25 .5 .3 .3], 'String', sprintfModel(this), 'FitBoxToText', 'on', 'FontSize', 8, 'LineStyle', 'none')
-            dbs = dbstack;
-            title(dbs(1).name)
-        end 
         function this = solve(this, varargin)
             ip = inputParser;
             addRequired(ip, 'loss_function', @(x) isa(x, 'function_handle'))
@@ -138,8 +71,8 @@ classdef Mintun1984SimulAnneal < mlpet.TracerSimulAnneal & mloxygen.Mintun1984St
             end
  			[ks_,sse,exitflag,output] = simulannealbnd( ...
                 @(ks__) ipr.loss_function( ...
-                       ks__, double(this.model.fs_Raichle_Martin), this.artery_interpolated, this.times_sampled, double(this.Measurement), this.timeCliff), ...
-                this.ks0, this.ks_lower, this.ks_upper, options); 
+                        ks__, this.Data, this.ArteryInterpolated, this.TimesSampled, double(this.Measurement)), ...
+                        this.ks0, this.ks_lower, this.ks_upper, options);
             
             this.product_ = struct('ks0', this.ks0, 'ks', ks_, 'sse', sse, 'exitflag', exitflag, 'output', output); 
             if ~this.quiet
@@ -155,12 +88,11 @@ classdef Mintun1984SimulAnneal < mlpet.TracerSimulAnneal & mloxygen.Mintun1984St
                 s = [s sprintf('\tk%i = %f\n', ky, this.ks(ky))]; %#ok<AGROW>
             end
             
-            fs = this.model.fs_Raichle_Martin;
-            for ky = 1:length(fs)-1
-                s = [s sprintf('\tfs(%i) = %f\n', ky, fs(ky))]; %#ok<AGROW>
-            end            
-            s = [s sprintf('\tv1 = %f\n', fs(end))];            
-            s = [s sprintf('\tE = 1 - exp(-PS/f) = %f\n', 1 - exp(-fs(2)/fs(1)))];
+            ks = this.Data.raichle_ks;
+            for ky = 1:length(ks)-1
+                s = [s sprintf('\tfs(%i) = %f\n', ky, ks(ky))]; %#ok<AGROW>
+            end
+            s = [s sprintf('\tE = 1 - exp(-PS/f) = %f\n', 1 - exp(-ks(2)/ks(1)))];
             
             s = [s sprintf('\tsigma0 = %f\n', this.sigma0)];
             for ky = this.map.keys
