@@ -29,7 +29,7 @@ classdef DispersedMartin1987Solver
     
 	properties (Dependent)   
         ks
-        results
+        product
     end
 
 	methods 
@@ -37,10 +37,10 @@ classdef DispersedMartin1987Solver
         %% GET
         
         function g = get.ks(this)
-            g = this.results_.ks;
+            g = this.product_.ks;
         end
-        function g = get.results(this)
-            g = this.results_;
+        function g = get.product(this)
+            g = this.product_;
         end
         
         %%
@@ -152,7 +152,7 @@ classdef DispersedMartin1987Solver
                 trapz(tacTimeRange, tac) / ...
                 trapz(aif_0_f);
             
-            this.results_ = struct('ks', ks_); 
+            this.product_ = struct('ks', ks_); 
             if ~this.quiet
                 fprintfModel(this)
             end
@@ -177,7 +177,7 @@ classdef DispersedMartin1987Solver
     %% PROTECTED
     
     properties (Access = protected)        
-        results_
+        product_
     end
     
     methods (Access = protected)
