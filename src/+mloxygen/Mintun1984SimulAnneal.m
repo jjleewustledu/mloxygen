@@ -21,20 +21,22 @@ classdef Mintun1984SimulAnneal < mlpet.TCSimulAnneal
         end                
         
         function fprintfModel(this)
-            fprintf('Simulated Annealing:\n');            
+            fprintf('%s:\n', stackstr());
             for ky = 1:length(this.ks)
-                fprintf('\tk%i = %f\n', ky, this.ks(ky));
-            end            
-            
-            ks = this.Data.raichle_ks;
-            for ky = 1:length(ks)-1
-                fprintf('\tfs(%i) = %f\n', ky, ks(ky));
+                fprintf('\t%s = %g\n', this.ks_names{ky}, this.ks(ky));
+            end 
+
+            raichleks = this.Data.raichleks;
+            for ky = 1:length(raichleks)
+                fprintf('\t%s = %g\n', mlkinetics.Raichle1983Model.ks_names{ky}, raichleks(ky));
             end
-            fprintf('\tE = 1 - exp(-PS/f) = %f\n', 1 - exp(-ks(2)/ks(1)));
-            
-            fprintf('\tsigma0 = %f\n', this.sigma0);
-            for ky = this.map.keys
-                fprintf('\tmap(''%s'') => %s\n', ky{1}, struct2str(this.map(ky{1})));
+            fprintf('\tE = 1 - exp(-PS/f) = %f\n', 1 - exp(-raichleks(2)/raichleks(1)));
+
+            fprintf('\tloss = %g\n', this.loss())
+            keys = natsort(this.map.keys);
+            for ky = 1:length(this.ks)
+                fprintf('\tmap(''%s'') => %s\n', this.ks_names{ky}, ...
+                    join(struct2str(this.map(keys{ky}), orientation='horz')));
             end
         end
         function this = solve(this, varargin)
@@ -83,20 +85,22 @@ classdef Mintun1984SimulAnneal < mlpet.TCSimulAnneal
             end
         end   
         function s = sprintfModel(this)
-            s = sprintf('Simulated Annealing:\n');
+            s = sprintf('%s:\n', stackstr());
             for ky = 1:length(this.ks)
-                s = [s sprintf('\tk%i = %f\n', ky, this.ks(ky))]; %#ok<AGROW>
+                s = [s sprintf('\t%s = %g\n', this.ks_names{ky}, this.ks(ky))]; %#ok<AGROW>
             end
-            
-            ks = this.Data.raichle_ks;
-            for ky = 1:length(ks)-1
-                s = [s sprintf('\tfs(%i) = %f\n', ky, ks(ky))]; %#ok<AGROW>
+
+            raichleks = this.Data.raichleks;
+            for ky = 1:length(raichleks)
+                s = [s sprintf('\t%s = %g\n', mlkinetics.Raichle1983Model.ks_names{ky}, raichleks(ky))]; %#ok<AGROW>
             end
-            s = [s sprintf('\tE = 1 - exp(-PS/f) = %f\n', 1 - exp(-ks(2)/ks(1)))];
-            
-            s = [s sprintf('\tsigma0 = %f\n', this.sigma0)];
-            for ky = this.map.keys
-                s = [s sprintf('\tmap(''%s'') => %s\n', ky{1}, struct2str(this.map(ky{1})))]; %#ok<AGROW>
+            s = [s sprintf('\tE = 1 - exp(-PS/f) = %f\n', 1 - exp(-raichleks(2)/raichleks(1)))];
+
+            s = [s sprintf('\tloss = %g\n', this.loss())];
+            keys = natsort(this.map.keys);
+            for ky = 1:length(this.ks)
+                s = [s sprintf('\tmap(''%s'') => %s\n', this.ks_names{ky}, ...
+                    join(struct2str(this.map(keys{ky}), orientation='horz')))]; %#ok<AGROW>
             end
         end
  	end 
